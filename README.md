@@ -2,6 +2,8 @@
 
 Practice the [ARTSEY](https://artsey.io) 0.8.1 one-handed layout on a real keyboard (left or right variant).
 
+**Live site: https://joxtacy.github.io/artsey-trainer/** (redeployed automatically on every push to `main`)
+
 ```sh
 bun install
 bun run dev      # http://localhost:5173
