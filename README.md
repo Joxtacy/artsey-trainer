@@ -1,21 +1,34 @@
 # ARTSEY Trainer
 
-Practice the [ARTSEY](https://artsey.io) 0.8.1 one-handed layout on a real keyboard (left or right variant).
+This web app helps you learn the [ARTSEY](https://artsey.io) 0.8.1 one-handed keyboard layout. Use it with a real ARTSEY keyboard (left or right variant).
 
-**Live site: https://joxtacy.github.io/artsey-trainer/** (redeployed automatically on every push to `main`)
+**Live site: https://joxtacy.github.io/artsey-trainer/**
+
+Each push to `main` deploys the site again automatically.
+
+## Commands
 
 ```sh
 bun install
-bun run dev      # http://localhost:5173
-bun run test     # layout data + logic tests
-bun run build    # type-check + production build to dist/
+bun run dev      # start the dev server on http://localhost:5173
+bun run test     # run the tests for the layout data and the logic
+bun run build    # do a type check and make a production build in dist/
 ```
 
-- **Learn**: adaptive drills per lesson; weak and new keys come up more often. The chord hint shows after a delay or on a miss.
-- **Type**: real words (optionally punctuation/numbers, or your own text) with a hint for the next chord.
-- **Chart**: the full reference card for the selected side. Type on the board and the keys you pressed light up, with the resulting character next to them.
+## Views
 
-The whole layout lives in `src/layout.ts`. Base combos are defined by key letter (they mirror between sides); layers are listed per side because some (brackets, nav, mouse) are not mirrored.
+- **Learn**: Practice the keys in lessons, one key at a time. The app shows weak keys and new keys more often. The chord hint shows after a delay, or when you type the wrong key.
+- **Type**: Type real words. You can add punctuation and numbers, or use your own text. A hint shows the chord for the next character.
+- **Chart**: See the full layout for the selected side. When you type, the keys of the chord light up. The character that you typed shows next to them.
 
-Keystrokes are matched by character, falling back to the US physical key code, so it works even if your OS keyboard layout isn't US English.
-Progress is stored in the browser's localStorage.
+## How it works
+
+All layout data is in `src/layout.ts`. The base combos on the left side are a mirror image of the right side. For this reason, the file defines them by key letter. Some layers (brackets, nav, mouse) are not a mirror image. For this reason, the file lists these layers for each side.
+
+The app compares the character of each keystroke with the target character. If they are different, the app compares the US physical key code. For this reason, the app also works when your operating system uses a keyboard layout that is not US English.
+
+The app keeps your progress in the localStorage of the browser.
+
+## Roadmap
+
+The planned features are in [ROADMAP.md](ROADMAP.md).
