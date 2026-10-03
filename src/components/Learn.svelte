@@ -1,12 +1,22 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { addConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../confusions';
   import { mastery, pick, record } from '../drill';
   import { ITEM_BY_ID, LESSONS, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
   import { settings } from '../settings.svelte';
   import Chord from './Chord.svelte';
 
-  const lesson = $derived(LESSONS.find((l) => l.id === settings.lesson) ?? LESSONS[0]);
+  const CONFUSIONS = 'confusions';
+  const confusionIds = $derived(confusionItems(settings.confusions));
+  const pairCount = $derived(confusedPairs(settings.confusions).length);
+  const lesson = $derived.by(() => {
+    if (settings.lesson === CONFUSIONS && confusionIds.length)
+      return { id: CONFUSIONS, title: 'My confusions', desc: '', items: confusionIds };
+    return LESSONS.find((l) => l.id === settings.lesson) ?? LESSONS[0];
+  });
+  // `lesson` is a new object whenever confusions change; only a real lesson switch should reset the prompt.
+  const lessonId = $derived(lesson.id);
 
   let currentId = $state<string>();
   let misses = $state(0);
@@ -17,6 +27,11 @@
 
   let start = 0;
   let locked = false;
+  // Wrong keys already recorded for the current prompt, so repeating one counts once.
+  let missedHere = new Set<string>();
+  // The confusions drill serves both items of a pair back to back.
+  let queue: string[] = [];
+  let lastPair: string | undefined;
   let hintTimer: ReturnType<typeof setTimeout> | undefined;
 
   const current = $derived(currentId ? ITEM_BY_ID.get(currentId) : undefined);
@@ -28,8 +43,24 @@
     if (settings.hint === 'delay') hintTimer = setTimeout(() => (showHint = true), settings.hintDelay);
   }
 
+  function pickNext(): string {
+    if (lesson.id === CONFUSIONS) {
+      if (!queue.length) {
+        const p = nextPair(settings.confusions, lastPair);
+        if (p) {
+          queue = [...p.ids];
+          lastPair = p.key;
+        }
+      }
+      const id = queue.shift();
+      if (id) return id;
+    }
+    return pick(lesson.items, settings.stats, currentId);
+  }
+
   function next(id?: string) {
-    currentId = id ?? pick(lesson.items, settings.stats, currentId);
+    currentId = id ?? pickNext();
+    missedHere = new Set();
     misses = 0;
     wrong = undefined;
     locked = false;
@@ -39,9 +70,13 @@
 
   // New lesson or changed hint mode: start a fresh prompt.
   $effect(() => {
-    void lesson.id;
+    void lessonId;
     void settings.hint;
-    untrack(() => next());
+    untrack(() => {
+      queue = [];
+      lastPair = undefined;
+      next();
+    });
   });
   $effect(() => () => clearTimeout(hintTimer));
 
@@ -71,6 +106,10 @@
       misses++;
       session.streak = 0;
       wrong = identify(e);
+      if (wrong && !missedHere.has(wrong.id)) {
+        missedHere.add(wrong.id);
+        settings.confusions = addConfusion(settings.confusions, current.id, wrong.id);
+      }
       if (settings.hint !== 'never') showHint = true;
       flash = 'bad';
       setTimeout(() => (flash = undefined), 300);
@@ -88,6 +127,7 @@
       return;
     }
     settings.stats = {};
+    settings.confusions = {};
     confirmingReset = false;
     next();
   }
@@ -110,6 +150,22 @@
         <span class="bar"><span style="width: {p}%"></span></span>
       </button>
     {/each}
+    <button
+      class="lesson"
+      class:active={lesson.id === CONFUSIONS}
+      disabled={!confusionIds.length}
+      onclick={() => (settings.lesson = CONFUSIONS)}
+    >
+      <span class="lt">My confusions</span>
+      <span class="ld">
+        {pairCount
+          ? `${pairCount} ${pairCount === 1 ? 'pair' : 'pairs'} of keys you mix up, drilled back to back`
+          : 'Keys you mix up show up here'}
+      </span>
+      {#if confusionIds.length}
+        <span class="bar"><span style="width: {lessonProgress(confusionIds)}%"></span></span>
+      {/if}
+    </button>
     <button class="reset" onclick={resetProgress} onblur={() => (confirmingReset = false)}>
       {confirmingReset ? 'Click again to erase all progress' : 'Reset progress'}
     </button>
@@ -171,6 +227,24 @@
           ><i class="m3"></i>good</span
         ><span><i class="m4"></i>mastered</span>
       </div>
+
+      {#if lesson.id === CONFUSIONS}
+        <div class="confusions">
+          <h3>Keys you mix up</h3>
+          {#each topConfusions(settings.confusions, 10) as c (`${c.target}|${c.typed}`)}
+            {@const target = ITEM_BY_ID.get(c.target)}
+            {@const typed = ITEM_BY_ID.get(c.typed)}
+            {#if target && typed}
+              <div class="crow">
+                <span class="cpart"><b>{typed.label}</b><Chord side={settings.side} chord={typed.chords[settings.side]} /></span>
+                <span class="muted">when you meant</span>
+                <span class="cpart"><b>{target.label}</b><Chord side={settings.side} chord={target.chords[settings.side]} /></span>
+                <span class="count">×{c.count}</span>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      {/if}
     {/if}
   </section>
 </div>
@@ -233,6 +307,46 @@
     height: 100%;
     background: var(--ok);
     transition: width 0.3s;
+  }
+  .lesson:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .confusions {
+    display: grid;
+    gap: 6px;
+    width: 100%;
+    max-width: 520px;
+    margin-top: 6px;
+  }
+  .confusions h3 {
+    margin: 0 0 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+  }
+  .crow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    background: var(--key);
+    border-radius: 8px;
+    padding: 6px 12px;
+  }
+  .cpart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .crow .cpart:first-child {
+    justify-content: flex-end;
+  }
+  .count {
+    font-weight: 700;
+    color: var(--bad);
   }
   .reset {
     margin-top: 10px;

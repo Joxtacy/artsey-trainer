@@ -1,3 +1,4 @@
+import type { Confusions } from './confusions';
 import type { Stats } from './drill';
 import type { Side } from './layout';
 
@@ -13,28 +14,42 @@ export interface Settings {
   numbers: boolean;
   wordCount: number;
   stats: Stats;
+  confusions: Confusions;
 }
 
 const KEY = 'artsey-trainer:v1';
 
-const DEFAULTS: Settings = {
-  side: 'right',
-  hint: 'delay',
-  hintDelay: 1500,
-  lesson: 'home',
-  view: 'learn',
-  punctuation: false,
-  numbers: false,
-  wordCount: 20,
-  stats: {},
-};
+function defaults(): Settings {
+  return {
+    side: 'right',
+    hint: 'delay',
+    hintDelay: 1500,
+    lesson: 'home',
+    view: 'learn',
+    punctuation: false,
+    numbers: false,
+    wordCount: 20,
+    stats: {},
+    confusions: {},
+  };
+}
+
+/** Saved data from older versions lacks newer fields; those fall back to their defaults. */
+export function parseSettings(raw: string | null): Settings {
+  if (!raw) return defaults();
+  try {
+    const saved = JSON.parse(raw);
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? { ...defaults(), ...saved } : defaults();
+  } catch {
+    return defaults();
+  }
+}
 
 export function load(): Settings {
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    return parseSettings(localStorage.getItem(KEY));
   } catch {
-    return { ...DEFAULTS };
+    return defaults();
   }
 }
 

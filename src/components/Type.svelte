@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { addConfusion } from '../confusions';
   import { record } from '../drill';
   import { ITEM_BY_CHAR, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
@@ -19,6 +20,8 @@
   let editing = $state(false);
   let usingCustom = $state(false);
   let hintTimer: ReturnType<typeof setTimeout> | undefined;
+  // Wrong keys already recorded at the current position, so repeating one counts once.
+  let missedHere = new Set<string>();
 
   const done = $derived(text.length > 0 && pos >= text.length);
   const nextItem = $derived(done ? undefined : ITEM_BY_CHAR.get(text[pos]));
@@ -49,6 +52,7 @@
     pos = 0;
     marks = [];
     missHere = false;
+    missedHere = new Set();
     wrong = undefined;
     startTs = 0;
     lastTs = 0;
@@ -102,12 +106,17 @@
       lastTs = now;
       pos++;
       missHere = false;
+      missedHere = new Set();
       wrong = undefined;
       if (pos < text.length) scheduleHint();
       else clearTimeout(hintTimer);
     } else {
       missHere = true;
       wrong = identify(e);
+      if (wrong && !missedHere.has(wrong.id)) {
+        missedHere.add(wrong.id);
+        settings.confusions = addConfusion(settings.confusions, nextItem.id, wrong.id);
+      }
       if (settings.hint !== 'never') showHint = true;
     }
   }
