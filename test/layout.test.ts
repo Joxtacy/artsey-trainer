@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_ITEMS, GRID, HOLD, ITEM_BY_CHAR, ITEM_BY_ID, ITEMS, LAYERS, LESSONS, describeChord, type Side } from '../src/layout';
+import { BASE_ITEMS, GRID, HOLD, ITEM_BY_CHAR, SHIFTED_ITEMS, ITEM_BY_ID, ITEMS, LAYERS, LESSONS, describeChord, type Side } from '../src/layout';
 
 const sig = (press: string[], hold?: string) => `${hold ?? ''}|${[...press].sort().join('')}`;
 const pos = (side: Side, k: string) => GRID[side].indexOf(k as never);
@@ -64,6 +64,25 @@ describe('layout', () => {
 
   it('every layer item has a chord on both sides', () => {
     for (const i of ITEMS) expect(i.chords.left.press.length + i.chords.right.press.length).toBeGreaterThan(0);
+  });
+
+  it('types shifted characters with one-shot Shift and then the base key', () => {
+    expect(ITEM_BY_CHAR.get(':')!.id).toBe('shift:colon');
+    expect(ITEM_BY_CHAR.get(':')!.chords.right).toEqual({ ...ITEM_BY_CHAR.get(';')!.chords.right, shift: true });
+    expect(ITEM_BY_CHAR.get('"')!.chords.left).toEqual({ ...ITEM_BY_CHAR.get("'")!.chords.left, shift: true });
+    expect(ITEM_BY_CHAR.get('*')!.chords.right).toEqual({ press: ['r', 't'], hold: 's', shift: true });
+    expect(describeChord(ITEM_BY_CHAR.get(':')!.chords.right)).toBe('Shift (R + T + S + E), then hold E, then T');
+    expect(describeChord(ITEM_BY_CHAR.get('"')!.chords.right)).toBe('Shift (R + T + S + E), then A + Y + I');
+  });
+
+  it('keeps direct chords ahead of shifted ones', () => {
+    expect(ITEM_BY_CHAR.get('(')!.id).toBe('brackets:(');
+    expect(ITEM_BY_CHAR.get('?')!.id).toBe('symbols:?');
+    expect(SHIFTED_ITEMS.map((i) => i.char).join('')).toBe(':"<>_+|~@#$%^&*');
+  });
+
+  it('uses ids without separator characters', () => {
+    for (const i of SHIFTED_ITEMS) expect(i.id).toMatch(/^shift:[a-z]+$/);
   });
 
   it('describes chords', () => {

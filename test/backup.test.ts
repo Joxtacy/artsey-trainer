@@ -44,6 +44,7 @@ describe('backup', () => {
     expect(result.ok && result.settings.confusions).toEqual({});
     expect(result.ok && result.settings.pairStats).toEqual({});
     expect(result.ok && result.settings.history).toEqual({});
+    expect(result.ok && [result.settings.code, result.settings.codeSamples]).toEqual([false, 4]);
     expect(result.ok && result.settings.focusWeak).toBe(false);
     expect(result.ok && result.settings.stats).toEqual(progress().stats);
   });
@@ -68,7 +69,8 @@ describe('backup', () => {
   });
 
   it('replaces bad preferences with defaults instead of rejecting the file', () => {
-    const result = readBackup(backup({ ...progress(), side: 'up', hint: 7, wordCount: -3 }));
+    const result = readBackup(backup({ ...progress(), side: 'up', hint: 7, wordCount: -3, code: 'yes', codeSamples: 0 }));
+    expect(result.ok && [result.settings.code, result.settings.codeSamples]).toEqual([false, 4]);
     expect(result.ok).toBe(true);
     expect(result.ok && [result.settings.side, result.settings.hint, result.settings.wordCount]).toEqual(['right', 'delay', 20]);
     expect(result.ok && result.settings.lesson).toBe('pairs');

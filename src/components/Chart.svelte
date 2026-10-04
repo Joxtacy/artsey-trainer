@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HOLD, ITEM_BY_ID, LAYERS, describeChord, type Layer } from '../layout';
+  import { HOLD, ITEM_BY_ID, LAYERS, SHIFTED_ITEMS, describeChord, type Layer } from '../layout';
   import { LiveTyping, SHIFT_SETTLE_MS, type LiveEntry } from '../live';
   import { settings } from '../settings.svelte';
   import Chord from './Chord.svelte';
@@ -47,6 +47,7 @@
     { title: 'Letters', items: ids('a b c d e f g h i j k l m n o p q r s t u v w x y z') },
     { title: 'Space & editing', items: ids('space enter backspace delete tab esc') },
     { title: 'Punctuation', items: ids("' . , / !") },
+    { title: 'Shifted (one-shot Shift, then the key)', items: SHIFTED_ITEMS.map((i) => i.id) },
     { title: 'Modifiers (* one-shot)', items: ids('ctrl gui alt shift shiftlock caps') },
     { title: 'System', items: ids('locknav lockmouse btselect clearbt') },
   ];

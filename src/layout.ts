@@ -12,6 +12,8 @@ export const GRID: Record<Side, Key[]> = {
 export interface Chord {
   press: Key[];
   hold?: Key;
+  /** Press one-shot Shift (R + T + S + E) first, then this chord. */
+  shift?: boolean;
 }
 
 /** How a keystroke is recognised: by `key`, or by US physical `code` (+ shift) as a fallback for non-US OS layouts. */
@@ -83,6 +85,11 @@ const CHAR_CODE: Record<string, [code: string, shift: boolean]> = {
   '}': ['BracketRight', true], '[': ['BracketLeft', false], ']': ['BracketRight', false],
   '\\': ['Backslash', false], ';': ['Semicolon', false], '`': ['Backquote', false],
   '-': ['Minus', false], '=': ['Equal', false],
+  // Shifted characters, typed with one-shot Shift and then the base key.
+  ':': ['Semicolon', true], '"': ['Quote', true], '<': ['Comma', true], '>': ['Period', true],
+  '_': ['Minus', true], '+': ['Equal', true], '|': ['Backslash', true], '~': ['Backquote', true],
+  '@': ['Digit2', true], '#': ['Digit3', true], '$': ['Digit4', true], '%': ['Digit5', true],
+  '^': ['Digit6', true], '&': ['Digit7', true], '*': ['Digit8', true],
 };
 
 function charMatch(ch: string): Match {
@@ -193,12 +200,39 @@ export const LAYER_ITEMS: Item[] = LAYERS.filter((l) => l.drill).flatMap((layer)
   }));
 });
 
-export const ITEMS: Item[] = [...BASE_ITEMS, ...LAYER_ITEMS];
+/**
+ * One-shot Shift and then a key gives that key's shifted character, as on a US keyboard.
+ * Ids use names because ':' '>' and '|' would clash with separators in saved stats.
+ */
+const SHIFTED: [char: string, base: string, id: string, name: string][] = [
+  [':', ';', 'colon', 'Colon'], ['"', "'", 'quote', 'Double quote'], ['<', ',', 'less', 'Less than'],
+  ['>', '.', 'greater', 'Greater than'], ['_', '-', 'underscore', 'Underscore'], ['+', '=', 'plus', 'Plus'],
+  ['|', '\\', 'pipe', 'Pipe'], ['~', '`', 'tilde', 'Tilde'], ['@', '2', 'at', 'At sign'], ['#', '3', 'hash', 'Hash'],
+  ['$', '4', 'dollar', 'Dollar'], ['%', '5', 'percent', 'Percent'], ['^', '6', 'caret', 'Caret'],
+  ['&', '7', 'and', 'Ampersand'], ['*', '8', 'star', 'Asterisk'],
+];
+
+const UNSHIFTED_BY_CHAR = new Map<string, Item>();
+for (const item of [...LAYER_ITEMS, ...BASE_ITEMS]) if (item.char) UNSHIFTED_BY_CHAR.set(item.char, item);
+
+export const SHIFTED_ITEMS: Item[] = SHIFTED.map(([char, base, id, name]) => {
+  const b = UNSHIFTED_BY_CHAR.get(base)!;
+  return {
+    id: `shift:${id}`,
+    label: char,
+    name,
+    char,
+    match: charMatch(char),
+    chords: { left: { ...b.chords.left, shift: true }, right: { ...b.chords.right, shift: true } },
+  };
+});
+
+export const ITEMS: Item[] = [...BASE_ITEMS, ...LAYER_ITEMS, ...SHIFTED_ITEMS];
 export const ITEM_BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
 
-/** Best way to type a character: base-layer combos win over layer keys (e.g. '!'). */
+/** Best way to type a character: base-layer combos win over layer keys (e.g. '!'), and both over Shift. */
 export const ITEM_BY_CHAR = new Map<string, Item>();
-for (const item of [...LAYER_ITEMS, ...BASE_ITEMS]) if (item.char) ITEM_BY_CHAR.set(item.char, item);
+for (const item of [...SHIFTED_ITEMS, ...LAYER_ITEMS, ...BASE_ITEMS]) if (item.char) ITEM_BY_CHAR.set(item.char, item);
 
 export interface Lesson {
   id: string;
@@ -220,9 +254,16 @@ export const LESSONS: Lesson[] = [
   { id: 'numbers', title: 'Numbers layer', desc: 'Hold S. 7 8 9 0 are two-key combos', items: layerIds('numbers') },
   { id: 'brackets', title: 'Brackets layer', desc: 'Hold A: ( ) [ ] { }', items: layerIds('brackets') },
   { id: 'symbols', title: 'Symbols layer', desc: 'Hold E: ! \\ ; ` ? - =', items: layerIds('symbols') },
+  {
+    id: 'shifted',
+    title: 'Shifted symbols',
+    desc: 'One-shot Shift, then a key: : " < > _ + | ~ @ # $ % ^ & *',
+    items: SHIFTED_ITEMS.map((i) => i.id),
+  },
 ];
 
 export function describeChord(c: Chord): string {
   const press = c.press.map((k) => k.toUpperCase()).join(' + ');
-  return c.hold ? `Hold ${c.hold.toUpperCase()}, then ${press}` : press;
+  const main = c.hold ? `Hold ${c.hold.toUpperCase()}, then ${press}` : press;
+  return c.shift ? `Shift (R + T + S + E), then ${main.replace(/^Hold/, 'hold')}` : main;
 }

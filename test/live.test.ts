@@ -70,6 +70,16 @@ describe('LiveTyping', () => {
     expect(live.entries[0]).toMatchObject({ label: '(', mods: [], chord: { press: ['r'], hold: 'a' } });
   });
 
+  it('explains a shifted character as one-shot Shift plus the base chord', () => {
+    const live = new LiveTyping('right');
+    live.keydown(SHIFT);
+    live.keydown(key(':', 'Semicolon', { shiftKey: true }));
+    live.settle();
+    live.keyup({ key: 'Shift' });
+    expect(live.entries).toHaveLength(1);
+    expect(live.entries[0]).toMatchObject({ label: ':', name: 'Colon', mods: [], chord: { press: ['t'], hold: 'e', shift: true } });
+  });
+
   it('shows Cmd + key with both chords', () => {
     const live = new LiveTyping('right');
     live.keydown(key('Meta', 'MetaLeft', { metaKey: true }));

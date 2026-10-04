@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { addConfusion, clearConfusion } from '../confusions';
+  import { generateCode } from '../code';
   import { record } from '../drill';
   import { logTypeRound } from '../history';
   import { pairKey, pairLabel, slowestPairs, weakestLetters, wordWeigher } from '../focus';
@@ -29,12 +30,20 @@
   const nextItem = $derived(done ? undefined : ITEM_BY_CHAR.get(text[pos]));
   const nextChord = $derived(nextItem?.chords[settings.side]);
 
-  // Group each word with its trailing space so lines only wrap after spaces.
-  const tokens = $derived.by(() => {
-    const out: { ch: string; i: number }[][] = [];
+  /** Where each code sample starts in `text`, so samples stay together on a line. Empty for words. */
+  let sampleStarts = $state<number[]>([]);
+
+  // Group each word with its trailing space so lines only wrap after spaces. In code mode, words are
+  // also grouped by sample, so a line only breaks inside a sample that is longer than a whole line.
+  const groups = $derived.by(() => {
+    const starts = new Set(sampleStarts);
+    const out: { ch: string; i: number }[][][] = [];
     for (let i = 0; i < text.length; i++) {
-      if (i === 0 || text[i - 1] === ' ') out.push([]);
-      out[out.length - 1].push({ ch: text[i], i });
+      const newWord = i === 0 || text[i - 1] === ' ';
+      if (newWord && (out.length === 0 || starts.has(i) || !starts.size)) out.push([]);
+      const group = out[out.length - 1];
+      if (newWord) group.push([]);
+      group[group.length - 1].push({ ch: text[i], i });
     }
     return out;
   });
@@ -52,7 +61,8 @@
     if (settings.hint === 'delay') hintTimer = setTimeout(() => (showHint = true), settings.hintDelay);
   }
 
-  function reset(newText: string) {
+  function reset(newText: string, starts: number[] = []) {
+    sampleStarts = starts;
     text = newText;
     pos = 0;
     marks = [];
@@ -66,6 +76,12 @@
 
   function newText() {
     usingCustom = false;
+    if (settings.code) {
+      const samples = generateCode(settings.codeSamples);
+      const starts = samples.map((_, k) => samples.slice(0, k).reduce((n, s) => n + s.length + 1, 0));
+      reset(samples.join(' '), starts);
+      return;
+    }
     reset(
       generateText({
         count: settings.wordCount,
@@ -77,7 +93,7 @@
   }
 
   function restart() {
-    if (usingCustom) reset(text);
+    if (usingCustom) reset(text, sampleStarts);
     else newText();
   }
 
@@ -94,6 +110,8 @@
     void settings.punctuation;
     void settings.numbers;
     void settings.focusWeak;
+    void settings.code;
+    void settings.codeSamples;
     void settings.hint;
     untrack(newText);
   });
@@ -155,16 +173,32 @@
 
 <div class="type">
   <div class="controls">
-    <label>
-      Words
-      <select bind:value={settings.wordCount}>
-        {#each [10, 20, 40, 80] as n (n)}<option value={n}>{n}</option>{/each}
-      </select>
+    {#if settings.code}
+      <label>
+        Samples
+        <select bind:value={settings.codeSamples}>
+          {#each [2, 4, 8, 16] as n (n)}<option value={n}>{n}</option>{/each}
+        </select>
+      </label>
+    {:else}
+      <label>
+        Words
+        <select bind:value={settings.wordCount}>
+          {#each [10, 20, 40, 80] as n (n)}<option value={n}>{n}</option>{/each}
+        </select>
+      </label>
+    {/if}
+    <label title="Short lines of code that mix letters with the brackets and symbols layers">
+      <input type="checkbox" bind:checked={settings.code} /> Code
     </label>
-    <label><input type="checkbox" bind:checked={settings.punctuation} /> Punctuation</label>
-    <label><input type="checkbox" bind:checked={settings.numbers} /> Numbers</label>
-    <label title="Pick words with the keys and transitions you are weakest at">
-      <input type="checkbox" bind:checked={settings.focusWeak} /> Focus on weak keys
+    <label class:off={settings.code}>
+      <input type="checkbox" bind:checked={settings.punctuation} disabled={settings.code} /> Punctuation
+    </label>
+    <label class:off={settings.code}>
+      <input type="checkbox" bind:checked={settings.numbers} disabled={settings.code} /> Numbers
+    </label>
+    <label class:off={settings.code} title="Pick words with the keys and transitions you are weakest at">
+      <input type="checkbox" bind:checked={settings.focusWeak} disabled={settings.code} /> Focus on weak keys
     </label>
     <button onclick={newText}>New text</button>
     <button onclick={() => (editing = !editing)}>{editing ? 'Cancel' : 'Custom text…'}</button>
@@ -177,7 +211,7 @@
     </div>
   {/if}
 
-  {#if settings.focusWeak && !editing}
+  {#if settings.focusWeak && !settings.code && !editing}
     <p class="focus">
       Weakest keys: <b>{weakest.map((l) => l.toUpperCase()).join(' ')}</b>
       ·
@@ -190,17 +224,21 @@
   {/if}
 
   <div class="text" class:done aria-live="off">
-    {#each tokens as word, wi (wi)}
-      <span class="word">
-        {#each word as { ch, i } (i)}
-          <span
-            class="c"
-            class:sp={ch === ' '}
-            class:ok={marks[i] === 'ok'}
-            class:err={marks[i] === 'err'}
-            class:cur={i === pos}
-            class:miss={i === pos && missHere}>{ch === ' ' ? '·' : ch}</span
-          >
+    {#each groups as group, gi (gi)}
+      <span class="group">
+        {#each group as word, wi (wi)}
+          <span class="word">
+            {#each word as { ch, i } (i)}
+              <span
+                class="c"
+                class:sp={ch === ' '}
+                class:ok={marks[i] === 'ok'}
+                class:err={marks[i] === 'err'}
+                class:cur={i === pos}
+                class:miss={i === pos && missHere}>{ch === ' ' ? '·' : ch}</span
+              >
+            {/each}
+          </span>
         {/each}
       </span>
     {/each}
@@ -260,6 +298,9 @@
     align-items: center;
     color: var(--muted);
   }
+  .controls label.off {
+    opacity: 0.5;
+  }
   .custom {
     display: grid;
     gap: 8px;
@@ -290,6 +331,11 @@
   }
   .text.done {
     opacity: 0.6;
+  }
+  .group {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
   .word {
     white-space: nowrap;

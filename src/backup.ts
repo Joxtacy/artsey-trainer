@@ -70,6 +70,8 @@ function withValidPreferences(s: Settings): Settings {
     punctuation: typeof s.punctuation === 'boolean',
     numbers: typeof s.numbers === 'boolean',
     focusWeak: typeof s.focusWeak === 'boolean',
+    code: typeof s.code === 'boolean',
+    codeSamples: isCount(s.codeSamples) && s.codeSamples > 0,
     wordCount: isCount(s.wordCount) && s.wordCount > 0,
   };
   const fixed = { ...s };

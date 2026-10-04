@@ -2,7 +2,9 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBackup } from '../src/backup';
+import { CODE_SAMPLES } from '../src/code';
 import { dayKey, logLearn, logTypeRound } from '../src/history';
+import { ITEM_BY_CHAR } from '../src/layout';
 import { parseSettings } from '../src/storage';
 import Learn from '../src/components/Learn.svelte';
 import Progress from '../src/components/Progress.svelte';
@@ -36,6 +38,8 @@ beforeEach(() => {
   settings.pairStats = {};
   settings.focusWeak = false;
   settings.history = {};
+  settings.code = false;
+  settings.codeSamples = 4;
   settings.lesson = 'pairs';
   settings.hint = 'never';
   settings.side = 'right';
@@ -165,6 +169,86 @@ describe('Type: weak keys and transitions', () => {
     settings.pairStats = { 'a>b': { n: 5, ok: 5, ms: 300 }, 'b>c': { n: 5, ok: 5, ms: 300 }, 't>h': { n: 5, ok: 5, ms: 900 } };
     render(Type);
     expect(text('.focus')).toContain('Slowest transitions: T→H');
+  });
+});
+
+describe('Type: code mode', () => {
+  /** Sends the key event the layout produces for a character (US key + Shift where needed). */
+  const typeChar = (ch: string) => {
+    const m = ITEM_BY_CHAR.get(ch)!.match!;
+    press(m.key, m.code ?? '', m.shift ?? false);
+  };
+  const currentText = () => [...document.querySelectorAll('.text .c')].map((c) => (c.textContent === '·' ? ' ' : c.textContent)).join('');
+  const toggleCode = () => {
+    [...document.querySelectorAll('label')].find((l) => l.textContent?.trim() === 'Code')!.querySelector('input')!.click();
+    flushSync();
+  };
+
+  it('switches the text to code samples and swaps the word options for a sample count', () => {
+    render(Type);
+    toggleCode();
+    expect(settings.code).toBe(true);
+    const t = currentText();
+    expect(CODE_SAMPLES.some((c) => t.startsWith(c))).toBe(true);
+    const labels = [...document.querySelectorAll('.controls label')].map((l) => l.textContent?.trim().split(/\s+/)[0]);
+    expect(labels).toContain('Samples');
+    expect(labels).not.toContain('Words');
+    for (const name of ['Punctuation', 'Numbers', 'Focus on weak keys']) {
+      const box = [...document.querySelectorAll('label')].find((l) => l.textContent?.trim() === name)!.querySelector('input')!;
+      expect(box.disabled, name).toBe(true);
+    }
+  });
+
+  it('keeps each sample together, so lines only break between samples', () => {
+    settings.code = true;
+    settings.codeSamples = 8;
+    render(Type);
+    const groups = [...document.querySelectorAll('.text .group')].map((g) => g.textContent!.replace(/·/g, ' ').trimEnd());
+    expect(groups).toHaveLength(8);
+    for (const g of groups) expect(CODE_SAMPLES).toContain(g);
+  });
+
+  it('can be typed from start to end, with layer hints along the way', () => {
+    settings.code = true;
+    settings.codeSamples = 16;
+    settings.hint = 'always';
+    render(Type);
+    const t = currentText();
+    let sawLayerHint = false;
+    for (const ch of t) {
+      if (ch === '(') {
+        expect(text('.hint .instr')).toBe('Hold A, then R');
+        sawLayerHint = true;
+      }
+      typeChar(ch);
+    }
+    expect(text('.result')).toContain('Done!');
+    expect(settings.history[dayKey(new Date())].type).toMatchObject({ n: t.length, ok: t.length, rounds: 1 });
+    // 16 samples practically always include a "(", but only assert it if one came up.
+    if (t.includes('(')) expect(sawLayerHint).toBe(true);
+  });
+
+  it('accepts every code sample, typed with the real key events', () => {
+    render(Type);
+    [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
+    flushSync();
+    const area = document.querySelector('textarea')!;
+    area.value = CODE_SAMPLES.join(' ');
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
+    flushSync();
+    expect(currentText()).toBe(CODE_SAMPLES.join(' '));
+    for (const ch of currentText()) typeChar(ch);
+    expect(text('.result')).toContain('100% accuracy');
+  });
+
+  it('goes back to words when code mode is turned off', () => {
+    settings.code = true;
+    render(Type);
+    toggleCode();
+    expect(settings.code).toBe(false);
+    expect(CODE_SAMPLES.some((c) => currentText().startsWith(c))).toBe(false);
   });
 });
 

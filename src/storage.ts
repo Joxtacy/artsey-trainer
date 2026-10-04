@@ -19,6 +19,9 @@ export interface Settings {
   /** Timing of each character-to-character transition in Type, keyed "from>to". */
   pairStats: Stats;
   focusWeak: boolean;
+  /** Type code samples instead of words. */
+  code: boolean;
+  codeSamples: number;
   /** Daily practice summaries for the Progress view. */
   history: History;
 }
@@ -39,6 +42,8 @@ function defaults(): Settings {
     confusions: {},
     pairStats: {},
     focusWeak: false,
+    code: false,
+    codeSamples: 4,
     history: {},
   };
 }
