@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { LAYOUTS } from '../src/layout';
 import { LiveTyping } from '../src/live';
+
+const L = LAYOUTS['0.8.1'];
 
 const key = (key: string, code: string, mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {}) => ({
   key,
@@ -15,7 +18,7 @@ const SHIFT = key('Shift', 'ShiftLeft', { shiftKey: true });
 
 describe('LiveTyping', () => {
   it('merges a one-shot Ctrl into the next key', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(key('Control', 'ControlLeft', { ctrlKey: true }));
     expect(live.entries[0]).toMatchObject({ label: 'Ctrl', pending: 'ctrl', chord: { press: ['s', 'e'] } });
     live.keydown(key('h', 'KeyH', { ctrlKey: true }));
@@ -24,14 +27,14 @@ describe('LiveTyping', () => {
   });
 
   it('keeps an unmerged modifier when the next key lacks it', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(key('Alt', 'AltLeft', { altKey: true }));
     live.keydown(key('h', 'KeyH'));
     expect(live.entries.map((e) => e.label)).toEqual(['h', 'Alt']);
   });
 
   it('treats a Shift that arrives together with a key as one-shot', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(SHIFT);
     live.keydown(key('B', 'KeyB', { shiftKey: true }));
     expect(live.settle()).toBe(false);
@@ -41,7 +44,7 @@ describe('LiveTyping', () => {
   });
 
   it('treats a Shift that stands alone as Shift lock, and shows it turning off', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(SHIFT);
     expect(live.entries[0].options).toHaveLength(2);
     expect(live.settle()).toBe(true);
@@ -55,7 +58,7 @@ describe('LiveTyping', () => {
   });
 
   it('folds the Shift a symbol is sent with', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(SHIFT);
     live.keydown(key('!', 'Digit1', { shiftKey: true }));
     live.settle();
@@ -65,13 +68,13 @@ describe('LiveTyping', () => {
   });
 
   it('does not treat the Shift inside a symbol as a modifier', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(key('(', 'Digit9', { shiftKey: true }));
     expect(live.entries[0]).toMatchObject({ label: '(', mods: [], chord: { press: ['r'], hold: 'a' } });
   });
 
   it('explains a shifted character as one-shot Shift plus the base chord', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(SHIFT);
     live.keydown(key(':', 'Semicolon', { shiftKey: true }));
     live.settle();
@@ -81,7 +84,7 @@ describe('LiveTyping', () => {
   });
 
   it('shows Cmd + key with both chords', () => {
-    const live = new LiveTyping('right');
+    const live = new LiveTyping('right', L);
     live.keydown(key('Meta', 'MetaLeft', { metaKey: true }));
     live.keydown(key('z', 'KeyZ', { metaKey: true }));
     expect(live.entries[0]).toMatchObject({ label: 'Gui + z', mods: [{ label: 'Gui', chord: { press: ['s', 'y'] } }] });

@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { HOLD, ITEM_BY_ID, LAYERS, SHIFTED_ITEMS, describeChord, type Layer } from '../layout';
+  import { HOLD, VERSIONS, describeChord, type Item, type Layer } from '../layout';
   import { LiveTyping, SHIFT_SETTLE_MS, type LiveEntry } from '../live';
-  import { settings } from '../settings.svelte';
+  import { layout, settings } from '../settings.svelte';
   import Chord from './Chord.svelte';
 
-  let live = new LiveTyping(settings.side);
+  const L = $derived(layout());
+  let live = new LiveTyping(settings.side, layout());
   // LiveTyping mutates entries when Shift resolves, so copy them out for Svelte to see.
   let entries = $state<LiveEntry[]>([]);
   const last = $derived(entries[0]);
@@ -32,9 +33,9 @@
     sync();
   }
 
-  // Chords depend on the side, so start fresh when it changes.
+  // Chords depend on the side and layout version, so start fresh when either changes.
   $effect(() => {
-    live = new LiveTyping(settings.side);
+    live = new LiveTyping(settings.side, L);
     sync();
   });
 
@@ -43,14 +44,22 @@
   const show = (label: string) => (label === ' ' ? '␣' : label);
 
   const ids = (s: string) => s.split(' ');
-  const SECTIONS = [
-    { title: 'Letters', items: ids('a b c d e f g h i j k l m n o p q r s t u v w x y z') },
-    { title: 'Space & editing', items: ids('space enter backspace delete tab esc') },
-    { title: 'Punctuation', items: ids("' . , / !") },
-    { title: 'Shifted (one-shot Shift, then the key)', items: SHIFTED_ITEMS.map((i) => i.id) },
-    { title: 'Modifiers (* one-shot)', items: ids('ctrl gui alt shift shiftlock caps') },
-    { title: 'System', items: ids('locknav lockmouse btselect clearbt') },
+  // Base ids; each section only shows the combos that the selected version has.
+  const SECTION_IDS = [
+    { title: 'Letters', ids: ids('a b c d e f g h i j k l m n o p q r s t u v w x y z') },
+    { title: 'Space & editing', ids: ids('space enter backspace delete tab esc') },
+    { title: 'Punctuation', ids: ids("' . , / ! ?") },
+    { title: 'Modifiers', ids: ids('ctrl gui alt shift shiftlock caps') },
+    { title: 'System', ids: ids('locknav lockmouse btselect clearbt clear') },
   ];
+  const sections = $derived([
+    ...SECTION_IDS.slice(0, 3).map((s) => ({ title: s.title, items: present(s.ids) })),
+    { title: 'Shifted (one-shot Shift, then the key)', items: L.shiftedItems },
+    ...SECTION_IDS.slice(3).map((s) => ({ title: s.title, items: present(s.ids) })),
+  ]);
+  function present(bases: string[]): Item[] {
+    return bases.map((b) => L.item(b)).filter((i): i is Item => !!i);
+  }
 
   const layerLabels = (layer: Layer) =>
     layer.cells[settings.side].map((c) => (c === HOLD ? 'HOLD' : c));
@@ -60,7 +69,8 @@
 
 <div class="chart">
   <p class="intro">
-    {settings.side === 'right' ? 'Right' : 'Left'}-hand layout. <span class="sw press"></span> press together,
+    {settings.side === 'right' ? 'Right' : 'Left'}-hand layout, version {VERSIONS.find((v) => v.id === settings.version)?.label}.
+    <span class="sw press"></span> press together,
     <span class="sw hold"></span> hold for the layer.
   </p>
 
@@ -94,8 +104,14 @@
           <div class="idle">
             <p>Type on your keyboard. The keys you pressed light up and the result shows here.</p>
             <p>
-              One-shot modifiers (Ctrl, Gui, Alt, Shift) only reach the computer together with your next key, so
-              press one followed by a letter, e.g. <b>Ctrl + h</b>, to check it.
+              {#if settings.version === '0.8.1'}
+                One-shot modifiers (Ctrl, Gui, Alt, Shift) only reach the computer together with your next key, so
+                press one followed by a letter, e.g. <b>Ctrl + h</b>, to check it.
+              {:else}
+                Modifiers only reach the computer together with your next key, so press one followed by a letter,
+                e.g. <b>Ctrl + h</b>, to check it. In 0.9.0, Ctrl, Gui, and Alt stay on until you press their combo
+                again.
+              {/if}
             </p>
           </div>
         {/if}
@@ -113,12 +129,11 @@
     {/if}
   </section>
 
-  {#each SECTIONS as sec (sec.title)}
+  {#each sections as sec (sec.title)}
     <section>
       <h2>{sec.title}</h2>
       <div class="grid">
-        {#each sec.items as id (id)}
-          {@const it = ITEM_BY_ID.get(id)!}
+        {#each sec.items as it (it.id)}
           {@const c = it.chords[settings.side]}
           <div class="card" title={describeChord(c)}>
             <span class="lbl" class:long={it.label.length > 2}>{it.label}</span>
@@ -133,14 +148,14 @@
   <section>
     <h2>Layers</h2>
     <div class="layers">
-      {#each LAYERS as layer (layer.id)}
+      {#each L.layers as layer (layer.id)}
         <div class="layer">
           <h3>{layer.title}</h3>
           <div class="how">
             {#if layer.hold}
               Hold <b>{layer.hold.toUpperCase()}</b>
             {:else if layer.lockItem}
-              {@const lc = ITEM_BY_ID.get(layer.lockItem)!.chords[settings.side]}
+              {@const lc = L.item(layer.lockItem)!.chords[settings.side]}
               Combo <Chord side={settings.side} chord={lc} /> <span>{describeChord(lc)}</span>
             {/if}
           </div>
@@ -153,7 +168,7 @@
           {#if layer.combos}
             <div class="combos">
               {#each layer.combos as [out] (out)}
-                {@const c = ITEM_BY_ID.get(`${layer.id}:${out}`)!.chords[settings.side]}
+                {@const c = L.item(`${layer.id}:${out}`)!.chords[settings.side]}
                 <span><b>{out}</b> <Chord side={settings.side} chord={c} /></span>
               {/each}
             </div>

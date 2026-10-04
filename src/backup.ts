@@ -63,6 +63,7 @@ function withValidPreferences(s: Settings): Settings {
   const d = parseSettings(null);
   const ok = {
     side: s.side === 'left' || s.side === 'right',
+    version: s.version === '0.8.1' || s.version === '0.9.0',
     hint: s.hint === 'always' || s.hint === 'delay' || s.hint === 'never',
     hintDelay: isCount(s.hintDelay),
     lesson: typeof s.lesson === 'string',

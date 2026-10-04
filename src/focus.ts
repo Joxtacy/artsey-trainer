@@ -1,5 +1,5 @@
 import { weight, type Stats } from './drill';
-import { ITEM_BY_CHAR, ITEM_BY_ID } from './layout';
+import type { Layout } from './layout';
 
 /** Pair stats are keyed "<from id>><to id>", e.g. "t>h" or "space>t". */
 export const pairKey = (from: string, to: string) => `${from}>${to}`;
@@ -53,10 +53,10 @@ export function weakestLetters(stats: Stats, limit = 5): string[] {
  * How strongly to favour a word: words made of weak letters, or containing slow transitions,
  * get a larger weight. A word of strong letters with no slow pairs stays near 1.
  */
-export function wordWeigher(stats: Stats, pairStats: Stats): (word: string) => number {
+export function wordWeigher(stats: Stats, pairStats: Stats, layout: Layout): (word: string) => number {
   const slow = new Map(slowestPairs(pairStats, Infinity).map((p) => [p.key, p.factor]));
   return (word) => {
-    const ids = word.split('').map((c) => ITEM_BY_CHAR.get(c)?.id).filter((id): id is string => !!id);
+    const ids = word.split('').map((c) => layout.byChar.get(c)?.id).filter((id): id is string => !!id);
     if (!ids.length) return 1;
     const letters = ids.filter((id) => /^[a-z]$/.test(id));
     const meanWeakness = letters.length ? letters.reduce((sum, id) => sum + weight(stats[id]), 0) / letters.length : 1;
@@ -67,7 +67,7 @@ export function wordWeigher(stats: Stats, pairStats: Stats): (word: string) => n
 }
 
 /** "T→H", using the on-screen labels (␣ for space). */
-export function pairLabel(from: string, to: string): string {
-  const label = (id: string) => ITEM_BY_ID.get(id)?.label ?? id;
+export function pairLabel(from: string, to: string, layout: Layout): string {
+  const label = (id: string) => layout.byId.get(id)?.label ?? id;
   return `${label(from)}→${label(to)}`;
 }

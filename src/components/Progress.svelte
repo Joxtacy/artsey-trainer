@@ -1,10 +1,10 @@
 <script lang="ts">
   import { overdue } from '../drill';
   import { daily, lessonTrends, type LessonTrend } from '../history';
-  import { ITEM_BY_ID, LESSONS } from '../layout';
-  import { settings } from '../settings.svelte';
+  import { layout, settings } from '../settings.svelte';
   import LineChart from './LineChart.svelte';
 
+  const L = $derived(layout());
   const RANGES = [14, 30, 90];
   let range = $state(30);
 
@@ -21,11 +21,12 @@
     Object.entries(settings.stats)
       .filter(([, s]) => overdue(s) > 0)
       .sort(([, a], [, b]) => overdue(b) - overdue(a))
-      .map(([id]) => ITEM_BY_ID.get(id)?.label ?? id),
+      .map(([id]) => L.byId.get(id)?.label)
+      .filter((label): label is string => !!label),
   );
 
   const trends = $derived(lessonTrends(settings.history));
-  const lessonTitle = (id: string) => (id === 'confusions' ? 'My confusions' : (LESSONS.find((l) => l.id === id)?.title ?? id));
+  const lessonTitle = (id: string) => (id === 'confusions' ? 'My confusions' : (L.lessons.find((l) => l.id === id)?.title ?? id));
   const pct = (t?: { n: number; ok: number }) => (t && t.n ? `${Math.round((t.ok / t.n) * 100)}%` : '–');
   const attempts = (t?: { n: number }) => (t ? t.n : 0);
   const fmtDay = (d: string) => {

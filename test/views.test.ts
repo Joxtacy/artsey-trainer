@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBackup } from '../src/backup';
 import { CODE_SAMPLES } from '../src/code';
 import { dayKey, logLearn, logTypeRound } from '../src/history';
-import { ITEM_BY_CHAR } from '../src/layout';
+import { LAYOUTS } from '../src/layout';
 import { parseSettings } from '../src/storage';
+import App from '../src/App.svelte';
+import Chart from '../src/components/Chart.svelte';
 import Learn from '../src/components/Learn.svelte';
 import Progress from '../src/components/Progress.svelte';
 import Type from '../src/components/Type.svelte';
@@ -27,7 +29,7 @@ const text = (sel: string) => document.querySelector(sel)?.textContent?.replace(
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let app: ReturnType<typeof mount> | undefined;
-const render = (c: typeof Learn | typeof Type | typeof Progress) => {
+const render = (c: typeof Learn | typeof Type | typeof Progress | typeof Chart | typeof App) => {
   app = mount(c, { target: document.body });
   flushSync();
 };
@@ -43,6 +45,7 @@ beforeEach(() => {
   settings.lesson = 'pairs';
   settings.hint = 'never';
   settings.side = 'right';
+  settings.version = '0.8.1';
 });
 afterEach(() => {
   if (app) unmount(app);
@@ -175,7 +178,7 @@ describe('Type: weak keys and transitions', () => {
 describe('Type: code mode', () => {
   /** Sends the key event the layout produces for a character (US key + Shift where needed). */
   const typeChar = (ch: string) => {
-    const m = ITEM_BY_CHAR.get(ch)!.match!;
+    const m = LAYOUTS[settings.version].byChar.get(ch)!.match!;
     press(m.key, m.code ?? '', m.shift ?? false);
   };
   const currentText = () => [...document.querySelectorAll('.text .c')].map((c) => (c.textContent === '·' ? ' ' : c.textContent)).join('');
@@ -431,5 +434,68 @@ describe('Progress', () => {
     reset.click();
     flushSync();
     expect(settings.history).toEqual({});
+  });
+});
+
+describe('layout versions', () => {
+  it('switches version from the header', () => {
+    settings.view = 'learn';
+    render(App);
+    const btn = [...document.querySelectorAll<HTMLButtonElement>('header button')].find((b) => b.textContent === '0.9.0')!;
+    btn.click();
+    flushSync();
+    expect(settings.version).toBe('0.9.0');
+    expect(btn.classList.contains('active')).toBe(true);
+  });
+
+  it('drills 0.9.0 punctuation and keeps its stats apart from 0.8.1', () => {
+    settings.version = '0.9.0';
+    settings.lesson = 'punct';
+    settings.stats = { ',': { n: 9, ok: 9, ms: 400 } };
+    render(Learn);
+    const tiles = [...document.querySelectorAll('.tile')].map((t) => t.textContent?.trim());
+    expect(tiles).toEqual(["'", '.', ',', '/', '!', '?']);
+    // Clicking a tile asks for that key.
+    [...document.querySelectorAll<HTMLButtonElement>('.tile')].find((t) => t.textContent?.trim() === ',')!.click();
+    flushSync();
+    expect(text('.glyph')).toBe(',');
+    press(',', 'Comma');
+    expect(settings.stats[',@0.9']).toMatchObject({ n: 1, ok: 1 });
+    expect(settings.stats[',']).toEqual({ n: 9, ok: 9, ms: 400 });
+  });
+
+  it('hides confusions recorded with the other version', () => {
+    settings.version = '0.9.0';
+    settings.confusions = { ',': { '.': 3 } }; // 0.8.1 ids: comma and period changed in 0.9.0
+    render(Learn);
+    const btn = [...document.querySelectorAll<HTMLButtonElement>('.lesson')].find((b) => b.textContent?.includes('My confusions'))!;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('shows the 0.9.0 chart', () => {
+    settings.version = '0.9.0';
+    render(Chart);
+    expect(text('.intro')).toContain('version 0.9.0.');
+    const labels = [...document.querySelectorAll('.card .lbl')].map((l) => l.textContent?.trim());
+    expect(labels).toContain('Clear');
+    expect(labels).toContain('?');
+    expect(labels).not.toContain('Caps');
+    expect(labels).not.toContain('#'); // a direct key in 0.9.0, so not in the Shifted section
+    expect([...document.querySelectorAll('.layer h3')].map((h) => h.textContent)).not.toContain('BT profile select');
+  });
+
+  it('gives 0.9.0 hints in Type', () => {
+    settings.version = '0.9.0';
+    settings.hint = 'always';
+    render(Type);
+    [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
+    flushSync();
+    const area = document.querySelector('textarea')!;
+    area.value = ',';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
+    flushSync();
+    expect(text('.hint .instr')).toBe('A + Y');
   });
 });

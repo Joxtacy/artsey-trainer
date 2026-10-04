@@ -1,4 +1,4 @@
-import { ITEM_BY_CHAR } from './layout';
+import type { Layout } from './layout';
 
 const WORDS = `the be to of and a in that have it for not on with he as you do at this but his by from they we
 say her she or an will my one all would there their what so up out if about who get which go me when make can like
@@ -68,13 +68,13 @@ export function generateText({ count, punctuation, numbers, weigh, rng = Math.ra
 }
 
 /** Normalise pasted text to what the layout can type: lowercase, single spaces, known characters only. */
-export function sanitize(text: string): string {
+export function sanitize(text: string, layout: Layout): string {
   return text
     .toLowerCase()
     .replace(/[’‘]/g, "'")
     .replace(/\s+/g, ' ')
     .split('')
-    .filter((c) => ITEM_BY_CHAR.has(c))
+    .filter((c) => layout.byChar.has(c))
     .join('')
     .trim();
 }

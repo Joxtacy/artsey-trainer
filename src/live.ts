@@ -1,4 +1,4 @@
-import { ITEM_BY_ID, type Chord, type Side } from './layout';
+import type { Chord, Layout, Side } from './layout';
 import { explain, type KeyLike } from './match';
 
 export interface LiveKey extends KeyLike {
@@ -58,11 +58,12 @@ export class LiveTyping {
 
   constructor(
     private side: Side,
+    private layout: Layout,
     private limit = 14,
   ) {}
 
-  private use(id: string): ModUse {
-    const item = ITEM_BY_ID.get(id)!;
+  private use(base: string): ModUse {
+    const item = this.layout.item(base)!;
     return { label: item.label, chord: item.chords[this.side] };
   }
 
@@ -81,7 +82,7 @@ export class LiveTyping {
       return true;
     }
 
-    const x = explain(e, this.side);
+    const x = explain(e, this.side, this.layout);
     if (!x) return false;
 
     // A key arriving with an undecided Shift came with it, so that Shift was a one-shot (or part of a symbol).
@@ -108,7 +109,7 @@ export class LiveTyping {
   settle(): boolean {
     if (!this.shiftDown || this.shiftKind !== 'unknown' || !this.shiftPress) return false;
     this.shiftKind = 'lock';
-    const item = ITEM_BY_ID.get('shiftlock')!;
+    const item = this.layout.item('shiftlock')!;
     Object.assign(this.shiftPress, {
       label: item.label,
       name: 'Shift lock on',
@@ -133,7 +134,7 @@ export class LiveTyping {
 
   private modifierDown(mod: Mod) {
     if (mod !== 'shift') {
-      const item = ITEM_BY_ID.get(mod)!;
+      const item = this.layout.item(mod)!;
       this.push({ label: item.label, name: item.name!, chord: item.chords[this.side], mods: [], pending: mod, note: 'Waiting for the next key…' });
       return;
     }

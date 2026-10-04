@@ -1,3 +1,4 @@
+import { LAYOUTS, type Layout } from './layout';
 import { load, save } from './storage';
 
 export const settings = $state(load());
@@ -6,3 +7,8 @@ export const settings = $state(load());
 $effect.root(() => {
   $effect(() => save(settings));
 });
+
+/** The layout for the selected version. Reactive when read inside components and effects. */
+export function layout(): Layout {
+  return LAYOUTS[settings.version];
+}

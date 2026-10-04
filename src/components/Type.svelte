@@ -5,9 +5,9 @@
   import { record } from '../drill';
   import { logTypeRound } from '../history';
   import { pairKey, pairLabel, slowestPairs, weakestLetters, wordWeigher } from '../focus';
-  import { ITEM_BY_CHAR, describeChord, type Item } from '../layout';
+  import { describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
-  import { settings } from '../settings.svelte';
+  import { layout, settings } from '../settings.svelte';
   import { generateText, sanitize } from '../words';
   import Chord from './Chord.svelte';
 
@@ -27,7 +27,8 @@
   let missedHere = new Set<string>();
 
   const done = $derived(text.length > 0 && pos >= text.length);
-  const nextItem = $derived(done ? undefined : ITEM_BY_CHAR.get(text[pos]));
+  const L = $derived(layout());
+  const nextItem = $derived(done ? undefined : L.byChar.get(text[pos]));
   const nextChord = $derived(nextItem?.chords[settings.side]);
 
   /** Where each code sample starts in `text`, so samples stay together on a line. Empty for words. */
@@ -49,7 +50,11 @@
   });
 
   const weakest = $derived(weakestLetters(settings.stats));
-  const slowPairs = $derived(slowestPairs(settings.pairStats, 3));
+  // Transition stats recorded with the other layout version can use ids this version doesn't have.
+  const visiblePairs = $derived(
+    Object.fromEntries(Object.entries(settings.pairStats).filter(([key]) => key.split('>').every((id) => L.byId.has(id)))),
+  );
+  const slowPairs = $derived(slowestPairs(visiblePairs, 3));
 
   const wpm = $derived(pos > 1 && lastTs > startTs ? Math.round(pos / 5 / ((lastTs - startTs) / 60000)) : 0);
   const accuracy = $derived(pos ? Math.round((marks.filter((m) => m === 'ok').length / pos) * 100) : 100);
@@ -87,7 +92,7 @@
         count: settings.wordCount,
         punctuation: settings.punctuation,
         numbers: settings.numbers,
-        weigh: settings.focusWeak ? wordWeigher(settings.stats, settings.pairStats) : undefined,
+        weigh: settings.focusWeak ? wordWeigher(settings.stats, visiblePairs, L) : undefined,
       }),
     );
   }
@@ -98,7 +103,7 @@
   }
 
   function useCustom() {
-    const t = sanitize(custom);
+    const t = sanitize(custom, L);
     if (!t) return;
     usingCustom = true;
     editing = false;
@@ -112,6 +117,7 @@
     void settings.focusWeak;
     void settings.code;
     void settings.codeSamples;
+    void settings.version;
     void settings.hint;
     untrack(newText);
   });
@@ -135,7 +141,7 @@
       if (pos > 0) {
         settings.stats[nextItem.id] = record(settings.stats[nextItem.id], !missHere, now - lastTs);
         // The same gap, filed under the transition from the previous character.
-        const prev = ITEM_BY_CHAR.get(text[pos - 1]);
+        const prev = L.byChar.get(text[pos - 1]);
         if (prev) {
           const key = pairKey(prev.id, nextItem.id);
           settings.pairStats[key] = record(settings.pairStats[key], !missHere, now - lastTs);
@@ -159,7 +165,7 @@
       }
     } else {
       missHere = true;
-      wrong = identify(e);
+      wrong = identify(e, L);
       if (wrong && !missedHere.has(wrong.id)) {
         missedHere.add(wrong.id);
         settings.confusions = addConfusion(settings.confusions, nextItem.id, wrong.id);
@@ -207,7 +213,7 @@
   {#if editing}
     <div class="custom">
       <textarea bind:value={custom} rows="4" placeholder="Paste any text. It is lowercased, and characters the layout can't type are dropped."></textarea>
-      <button class="primary" onclick={useCustom} disabled={!sanitize(custom)}>Practice this text</button>
+      <button class="primary" onclick={useCustom} disabled={!sanitize(custom, L)}>Practice this text</button>
     </div>
   {/if}
 
@@ -216,7 +222,7 @@
       Weakest keys: <b>{weakest.map((l) => l.toUpperCase()).join(' ')}</b>
       ·
       {#if slowPairs.length}
-        Slowest transitions: <b>{slowPairs.map((p) => pairLabel(p.from, p.to)).join(', ')}</b>
+        Slowest transitions: <b>{slowPairs.map((p) => pairLabel(p.from, p.to, L)).join(', ')}</b>
       {:else}
         <span class="muted">Slow transitions show up after a few rounds.</span>
       {/if}
@@ -257,7 +263,7 @@
         <p class="slow">
           Slowest transitions:
           {#each slowPairs as p (p.key)}
-            <span class="chip"><b>{pairLabel(p.from, p.to)}</b> {p.ms}ms</span>
+            <span class="chip"><b>{pairLabel(p.from, p.to, L)}</b> {p.ms}ms</span>
           {/each}
         </p>
       {/if}

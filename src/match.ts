@@ -1,5 +1,5 @@
-import type { Chord, Item, Match, Side } from './layout';
-import { BASE_ITEMS, GRID, ITEM_BY_ID, ITEMS, LAYERS } from './layout';
+import type { Chord, Item, Layout, Match, Side } from './layout';
+import { GRID } from './layout';
 
 export interface KeyLike {
   key: string;
@@ -22,8 +22,9 @@ export function matches(e: KeyLike, m: Match): boolean {
 }
 
 /** Work out which item the user actually typed, to show them the chord they hit. */
-export function identify(e: KeyLike): Item | undefined {
-  return BASE_ITEMS.find((i) => i.match && matches(e, i.match)) ?? ITEMS.find((i) => i.match && matches(e, i.match));
+export function identify(e: KeyLike, layout: Layout): Item | undefined {
+  const hit = (i: Item) => !!i.match && matches(e, i.match);
+  return layout.baseItems.find(hit) ?? layout.items.find(hit);
 }
 
 /** Skip auto-repeat, OS/browser shortcuts, and typing inside form fields. */
@@ -62,26 +63,27 @@ const NAV_OUTPUT: Record<string, string> = {
   PageDown: 'PgDn',
 };
 
-function itemName(item: Item): string {
+function itemName(item: Item, layout: Layout): string {
   if (item.name) return item.name;
-  const layer = LAYERS.find((l) => item.id.startsWith(`${l.id}:`));
+  const layer = layout.layers.find((l) => item.base.startsWith(`${l.id}:`));
   return layer ? `${layer.title} layer` : 'Letter';
 }
 
 /** Explain any keystroke as the chord that produced it, including modifiers and locked-nav keys. */
-export function explain(e: KeyLike, side: Side): Explained | undefined {
+export function explain(e: KeyLike, side: Side, layout: Layout): Explained | undefined {
   const mod = MODIFIER_ITEM[e.key];
-  const item = mod ? ITEM_BY_ID.get(mod) : identify(e);
+  const item = mod ? layout.item(mod) : identify(e, layout);
   if (item) {
     // Case comes from Shift rather than e.key, which Alt on macOS turns into other characters.
-    const letter = /^[a-z]$/.test(item.id);
-    const label = letter ? (e.shiftKey ? item.id.toUpperCase() : item.id) : item.label;
+    const letter = /^[a-z]$/.test(item.base);
+    const label = letter ? (e.shiftKey ? item.base.toUpperCase() : item.base) : item.label;
     const symbol = !letter && !!item.char && item.char !== ' ';
-    return { label, name: itemName(item), chord: item.chords[side], letter, symbol };
+    return { label, name: itemName(item, layout), chord: item.chords[side], letter, symbol };
   }
   const nav = NAV_OUTPUT[e.key];
-  if (nav) {
-    const pos = LAYERS.find((l) => l.id === 'nav')!.cells[side].indexOf(nav);
+  const navLayer = layout.layers.find((l) => l.id === 'nav');
+  if (nav && navLayer) {
+    const pos = navLayer.cells[side].indexOf(nav);
     return { label: nav, name: 'Nav layer (locked)', chord: { press: [GRID[side][pos]] }, letter: false, symbol: false };
   }
   return undefined;

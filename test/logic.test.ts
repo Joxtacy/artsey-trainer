@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { mastery, pick, record } from '../src/drill';
-import { ITEM_BY_ID } from '../src/layout';
+import { LAYOUTS } from '../src/layout';
+
+const L = LAYOUTS['0.8.1'];
+const ITEM_BY_ID = L.byId;
 import { explain, identify, isIgnorable, matches } from '../src/match';
 
 const ev = (key: string, code: string, shiftKey = false) => ({ key, code, shiftKey });
@@ -15,8 +18,8 @@ describe('matches', () => {
     expect(matches(ev('9', 'Digit9', false), ITEM_BY_ID.get('brackets:(')!.match!)).toBe(false);
   });
   it('identifies what was typed', () => {
-    expect(identify(ev(' ', 'Space'))?.id).toBe('space');
-    expect(identify(ev('?', 'Slash', true))?.id).toBe('symbols:?');
+    expect(identify(ev(' ', 'Space'), L)?.id).toBe('space');
+    expect(identify(ev('?', 'Slash', true), L)?.id).toBe('symbols:?');
   });
   it('ignores bare modifiers', () => {
     expect(isIgnorable(ev('Shift', 'ShiftLeft', true))).toBe(true);
@@ -51,21 +54,21 @@ describe('drill', () => {
 
 describe('explain', () => {
   it('explains letters, keeping case', () => {
-    expect(explain(ev('B', 'KeyB', true), 'right')).toMatchObject({ label: 'B', name: 'Letter', chord: { press: ['e', 'o'] }, letter: true });
-    expect(explain(ev('å', 'KeyA'), 'right')?.label).toBe('a');
-    expect(explain(ev('b', 'KeyB'), 'right')?.label).toBe('b');
+    expect(explain(ev('B', 'KeyB', true), 'right', L)).toMatchObject({ label: 'B', name: 'Letter', chord: { press: ['e', 'o'] }, letter: true });
+    expect(explain(ev('å', 'KeyA'), 'right', L)?.label).toBe('a');
+    expect(explain(ev('b', 'KeyB'), 'right', L)?.label).toBe('b');
   });
   it('explains layer characters', () => {
-    expect(explain(ev('7', 'Digit7'), 'left')).toMatchObject({ name: 'Numbers layer', chord: { press: ['a', 'r'], hold: 's' } });
+    expect(explain(ev('7', 'Digit7'), 'left', L)).toMatchObject({ name: 'Numbers layer', chord: { press: ['a', 'r'], hold: 's' } });
   });
   it('explains one-shot modifiers', () => {
-    expect(explain(ev('Meta', 'MetaLeft'), 'right')).toMatchObject({ label: 'Gui', chord: { press: ['s', 'y'] } });
+    expect(explain(ev('Meta', 'MetaLeft'), 'right', L)).toMatchObject({ label: 'Gui', chord: { press: ['s', 'y'] } });
   });
   it('explains locked nav keys per side', () => {
-    expect(explain(ev('Home', 'Home'), 'right')?.chord).toEqual({ press: ['a'] });
-    expect(explain(ev('Home', 'Home'), 'left')?.chord).toEqual({ press: ['t'] });
+    expect(explain(ev('Home', 'Home'), 'right', L)?.chord).toEqual({ press: ['a'] });
+    expect(explain(ev('Home', 'Home'), 'left', L)?.chord).toEqual({ press: ['t'] });
   });
   it('returns undefined for unknown keys', () => {
-    expect(explain(ev('F5', 'F5'), 'right')).toBeUndefined();
+    expect(explain(ev('F5', 'F5'), 'right', L)).toBeUndefined();
   });
 });

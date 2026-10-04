@@ -3,6 +3,7 @@
   import Learn from './components/Learn.svelte';
   import Progress from './components/Progress.svelte';
   import Type from './components/Type.svelte';
+  import { VERSIONS } from './layout';
   import { settings } from './settings.svelte';
 
   const VIEWS = [
@@ -28,6 +29,11 @@
     {/each}
   </nav>
   <div class="opts">
+    <div class="seg" role="group" aria-label="Layout version">
+      {#each VERSIONS as v (v.id)}
+        <button class:active={settings.version === v.id} onclick={() => (settings.version = v.id)}>{v.label}</button>
+      {/each}
+    </div>
     <div class="seg" role="group" aria-label="Keyboard side">
       <button class:active={settings.side === 'left'} onclick={() => (settings.side = 'left')}>Left</button>
       <button class:active={settings.side === 'right'} onclick={() => (settings.side = 'right')}>Right</button>

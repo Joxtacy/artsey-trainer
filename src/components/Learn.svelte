@@ -3,19 +3,29 @@
   import { addConfusion, clearConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../confusions';
   import { mastery, pick, record } from '../drill';
   import { logLearn } from '../history';
-  import { ITEM_BY_ID, LESSONS, describeChord, type Item } from '../layout';
+  import { describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
-  import { settings } from '../settings.svelte';
+  import { layout, settings } from '../settings.svelte';
   import Backup from './Backup.svelte';
   import Chord from './Chord.svelte';
 
   const CONFUSIONS = 'confusions';
-  const confusionIds = $derived(confusionItems(settings.confusions));
-  const pairCount = $derived(confusedPairs(settings.confusions).length);
+  const L = $derived(layout());
+  // Confusions recorded with the other layout version can use ids this version doesn't have.
+  const visibleConfusions = $derived(
+    Object.fromEntries(
+      Object.entries(settings.confusions)
+        .filter(([target]) => L.byId.has(target))
+        .map(([target, row]) => [target, Object.fromEntries(Object.entries(row).filter(([typed]) => L.byId.has(typed)))])
+        .filter(([, row]) => Object.keys(row).length),
+    ),
+  );
+  const confusionIds = $derived(confusionItems(visibleConfusions));
+  const pairCount = $derived(confusedPairs(visibleConfusions).length);
   const lesson = $derived.by(() => {
     // Stays on the confusions drill even when it empties, so clearing the last pair shows "all clear".
     if (settings.lesson === CONFUSIONS) return { id: CONFUSIONS, title: 'My confusions', desc: '', items: confusionIds };
-    return LESSONS.find((l) => l.id === settings.lesson) ?? LESSONS[0];
+    return L.lessons.find((l) => l.id === settings.lesson) ?? L.lessons[0];
   });
   // `lesson` is a new object whenever confusions change; only a real lesson switch should reset the prompt.
   const lessonId = $derived(lesson.id);
@@ -36,7 +46,7 @@
   let lastPair: string | undefined;
   let hintTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const current = $derived(currentId ? ITEM_BY_ID.get(currentId) : undefined);
+  const current = $derived(currentId ? L.byId.get(currentId) : undefined);
   const chord = $derived(current?.chords[settings.side]);
 
   function scheduleHint() {
@@ -51,7 +61,7 @@
       // Drop queued items whose pair was just cleared.
       queue = queue.filter((id) => confusionIds.includes(id));
       if (!queue.length) {
-        const p = nextPair(settings.confusions, lastPair);
+        const p = nextPair(visibleConfusions, lastPair);
         if (p) {
           queue = [...p.ids];
           lastPair = p.key;
@@ -73,9 +83,10 @@
     scheduleHint();
   }
 
-  // New lesson or changed hint mode: start a fresh prompt.
+  // New lesson, layout version, or hint mode: start a fresh prompt.
   $effect(() => {
     void lessonId;
+    void settings.version;
     void settings.hint;
     untrack(() => {
       queue = [];
@@ -113,7 +124,7 @@
     } else {
       misses++;
       session.streak = 0;
-      wrong = identify(e);
+      wrong = identify(e, L);
       if (wrong && !missedHere.has(wrong.id)) {
         missedHere.add(wrong.id);
         settings.confusions = addConfusion(settings.confusions, current.id, wrong.id);
@@ -152,7 +163,7 @@
 <div class="learn">
   <aside class="lessons">
     <h2>Lessons</h2>
-    {#each LESSONS as l (l.id)}
+    {#each L.lessons as l (l.id)}
       {@const p = lessonProgress(l.items)}
       <button class="lesson" class:active={l.id === lesson.id} onclick={() => (settings.lesson = l.id)}>
         <span class="lt">{l.title}</span>
@@ -221,7 +232,7 @@
 
       <div class="tiles" aria-label="Mastery for this lesson">
         {#each lesson.items as id (id)}
-          {@const it = ITEM_BY_ID.get(id)!}
+          {@const it = L.byId.get(id)!}
           {@const s = settings.stats[id]}
           <button
             class="tile m{mastery(s)}"
@@ -243,9 +254,9 @@
         <div class="confusions">
           <h3>Keys you mix up</h3>
           <p class="hint-note muted">Each time you type a key right on the first try, one mistake for it is removed.</p>
-          {#each topConfusions(settings.confusions, 10) as c (`${c.target}|${c.typed}`)}
-            {@const target = ITEM_BY_ID.get(c.target)}
-            {@const typed = ITEM_BY_ID.get(c.typed)}
+          {#each topConfusions(visibleConfusions, 10) as c (`${c.target}|${c.typed}`)}
+            {@const target = L.byId.get(c.target)}
+            {@const typed = L.byId.get(c.typed)}
             {#if target && typed}
               <div class="crow">
                 <span class="cpart"><b>{typed.label}</b><Chord side={settings.side} chord={typed.chords[settings.side]} /></span>

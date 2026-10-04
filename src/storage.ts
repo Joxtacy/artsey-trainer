@@ -1,12 +1,13 @@
 import type { Confusions } from './confusions';
 import type { Stats } from './drill';
 import type { History } from './history';
-import type { Side } from './layout';
+import type { Side, Version } from './layout';
 
 export type HintMode = 'always' | 'delay' | 'never';
 
 export interface Settings {
   side: Side;
+  version: Version;
   hint: HintMode;
   hintDelay: number;
   lesson: string;
@@ -31,6 +32,7 @@ const KEY = 'artsey-trainer:v1';
 function defaults(): Settings {
   return {
     side: 'right',
+    version: '0.8.1',
     hint: 'delay',
     hintDelay: 1500,
     lesson: 'home',

@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { CODE_SAMPLES, generateCode } from '../src/code';
-import { ITEM_BY_CHAR } from '../src/layout';
+import { LAYOUTS, VERSIONS } from '../src/layout';
 import { sanitize } from '../src/words';
 
 const seeded = (seed = 5) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
 describe('code samples', () => {
-  it.each(CODE_SAMPLES)('can be typed on the layout: %s', (sample) => {
-    const missing = [...sample].filter((c) => !ITEM_BY_CHAR.has(c));
-    expect(missing).toEqual([]);
-    // Same text after the custom-text cleanup, so nothing would be dropped or changed.
-    expect(sanitize(sample)).toBe(sample);
+  describe.each(VERSIONS.map((v) => v.id))('on layout %s', (version) => {
+    const L = LAYOUTS[version];
+    it.each(CODE_SAMPLES)('can be typed: %s', (sample) => {
+      const missing = [...sample].filter((c) => !L.byChar.has(c));
+      expect(missing).toEqual([]);
+      // Same text after the custom-text cleanup, so nothing would be dropped or changed.
+      expect(sanitize(sample, L)).toBe(sample);
+    });
   });
 
   it('use the bracket and symbol layers, and every shifted character', () => {

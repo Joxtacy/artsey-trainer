@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Stats } from '../src/drill';
 import { pairLabel, slowestPairs, weakestLetters, wordWeigher } from '../src/focus';
+import { LAYOUTS } from '../src/layout';
 import { generateText } from '../src/words';
 
+const L = LAYOUTS['0.8.1'];
 const seeded = (seed = 7) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const strong = { n: 20, ok: 20, ms: 400 };
 const weak = { n: 20, ok: 8, ms: 2500 };
@@ -37,13 +39,13 @@ describe('weakestLetters', () => {
 
 describe('wordWeigher', () => {
   it('favours words made of weak letters', () => {
-    const w = wordWeigher(allStrongExcept(WEAK), {});
+    const w = wordWeigher(allStrongExcept(WEAK), {}, L);
     expect(w('quick')).toBeGreaterThan(w('the') * 2);
   });
 
   it('favours words containing a slow transition', () => {
     const pairs = { 't>h': pair(1200), 'a>n': pair(300), 'n>d': pair(300), 'o>f': pair(300) };
-    const w = wordWeigher(allStrongExcept(''), pairs);
+    const w = wordWeigher(allStrongExcept(''), pairs, L);
     expect(w('the')).toBeGreaterThan(w('and'));
   });
 });
@@ -57,12 +59,12 @@ describe('generateText with focus', () => {
   it('uses more weak letters than random text', () => {
     const opts = { count: 2000, punctuation: false, numbers: false };
     const random = generateText({ ...opts, rng: seeded() });
-    const focused = generateText({ ...opts, rng: seeded(), weigh: wordWeigher(allStrongExcept(WEAK), {}) });
+    const focused = generateText({ ...opts, rng: seeded(), weigh: wordWeigher(allStrongExcept(WEAK), {}, L) });
     expect(share(focused)).toBeGreaterThan(share(random) * 2);
   });
 });
 
 it('labels pairs with on-screen labels', () => {
-  expect(pairLabel('t', 'h')).toBe('T→H');
-  expect(pairLabel('space', 't')).toBe('␣→T');
+  expect(pairLabel('t', 'h', L)).toBe('T→H');
+  expect(pairLabel('space', 't', L)).toBe('␣→T');
 });

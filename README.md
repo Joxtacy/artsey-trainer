@@ -1,6 +1,6 @@
 # ARTSEY Trainer
 
-This web app helps you learn the [ARTSEY](https://artsey.io) 0.8.1 one-handed keyboard layout. Use it with a real ARTSEY keyboard (left or right variant).
+This web app helps you learn the [ARTSEY](https://artsey.io) one-handed keyboard layout. Use it with a real ARTSEY keyboard (left or right variant). You can select the layout version: 0.8.1 (current) or 0.9.0 (beta).
 
 **Live site: https://joxtacy.github.io/artsey-trainer/**
 
@@ -24,7 +24,9 @@ bun run build    # do a type check and make a production build in dist/
 
 ## How it works
 
-All layout data is in `src/layout.ts`. The base combos on the left side are a mirror image of the right side. For this reason, the file defines them by key letter. Some layers (brackets, nav, mouse) are not a mirror image. For this reason, the file lists these layers for each side.
+All layout data is in `src/layout.ts`, with one definition for each version. The base combos on the left side are a mirror image of the right side. For this reason, the file defines them by key letter. Some layers are not a mirror image. For this reason, the file lists the layers for each side.
+
+The two versions share progress for keys that have the same chord in both versions. A key with a different chord in 0.9.0 has its own progress.
 
 The app compares the character of each keystroke with the target character. If they are different, the app compares the US physical key code. For this reason, the app also works when your operating system uses a keyboard layout that is not US English.
 

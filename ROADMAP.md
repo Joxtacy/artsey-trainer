@@ -6,7 +6,7 @@ When an item is done, move it to the "Done" section in the same commit.
 
 ## Next (priority: high)
 
-- [#9 Support both layout versions: 0.8.1 (current) and 0.9.0 (beta)](https://github.com/Joxtacy/artsey-trainer/issues/9)
+All high-priority items are done.
 
 ## Later (priority: low)
 
@@ -21,5 +21,6 @@ When an item is done, move it to the "Done" section in the same commit.
 - [x] [#2 Type view: practice weak keys and slow chord transitions](https://github.com/Joxtacy/artsey-trainer/issues/2)
 - [x] [#3 Show progress over time and add spaced repetition](https://github.com/Joxtacy/artsey-trainer/issues/3)
 - [x] [#5 Type view: add a code mode to practice brackets and symbols](https://github.com/Joxtacy/artsey-trainer/issues/5)
+- [x] [#9 Support both layout versions: 0.8.1 (current) and 0.9.0 (beta)](https://github.com/Joxtacy/artsey-trainer/issues/9)
 
 To see all open roadmap issues, use the [enhancement label](https://github.com/Joxtacy/artsey-trainer/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement).
