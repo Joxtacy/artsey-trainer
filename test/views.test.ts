@@ -210,7 +210,8 @@ describe('Type: code mode', () => {
 
   it('can be typed from start to end, with layer hints along the way', () => {
     settings.code = true;
-    settings.codeSamples = 16;
+    // Kept short: each key re-checks every character on screen, so long texts get slow.
+    settings.codeSamples = 6;
     settings.hint = 'always';
     render(Type);
     const t = currentText();
@@ -224,23 +225,27 @@ describe('Type: code mode', () => {
     }
     expect(text('.result')).toContain('Done!');
     expect(settings.history[dayKey(new Date())].type).toMatchObject({ n: t.length, ok: t.length, rounds: 1 });
-    // 16 samples practically always include a "(", but only assert it if one came up.
+    // Only assert the layer hint if a "(" came up in this random text.
     if (t.includes('(')) expect(sawLayerHint).toBe(true);
   });
 
   it('accepts every code sample, typed with the real key events', () => {
     render(Type);
-    [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
-    flushSync();
-    const area = document.querySelector('textarea')!;
-    area.value = CODE_SAMPLES.join(' ');
-    area.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
-    flushSync();
-    expect(currentText()).toBe(CODE_SAMPLES.join(' '));
-    for (const ch of currentText()) typeChar(ch);
-    expect(text('.result')).toContain('100% accuracy');
+    // One short round per sample: typing them all as one long text is slow, because each key
+    // re-checks every character on screen.
+    for (const sample of CODE_SAMPLES) {
+      [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
+      flushSync();
+      const area = document.querySelector('textarea')!;
+      area.value = sample;
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+      flushSync();
+      document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
+      flushSync();
+      expect(currentText()).toBe(sample);
+      for (const ch of sample) typeChar(ch);
+      expect(text('.result'), sample).toContain('100% accuracy');
+    }
   });
 
   it('goes back to words when code mode is turned off', () => {
