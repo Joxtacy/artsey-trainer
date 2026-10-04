@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { addConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../confusions';
+  import { addConfusion, clearConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../confusions';
   import { mastery, pick, record } from '../drill';
   import { ITEM_BY_ID, LESSONS, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
@@ -11,8 +11,8 @@
   const confusionIds = $derived(confusionItems(settings.confusions));
   const pairCount = $derived(confusedPairs(settings.confusions).length);
   const lesson = $derived.by(() => {
-    if (settings.lesson === CONFUSIONS && confusionIds.length)
-      return { id: CONFUSIONS, title: 'My confusions', desc: '', items: confusionIds };
+    // Stays on the confusions drill even when it empties, so clearing the last pair shows "all clear".
+    if (settings.lesson === CONFUSIONS) return { id: CONFUSIONS, title: 'My confusions', desc: '', items: confusionIds };
     return LESSONS.find((l) => l.id === settings.lesson) ?? LESSONS[0];
   });
   // `lesson` is a new object whenever confusions change; only a real lesson switch should reset the prompt.
@@ -43,8 +43,11 @@
     if (settings.hint === 'delay') hintTimer = setTimeout(() => (showHint = true), settings.hintDelay);
   }
 
-  function pickNext(): string {
+  function pickNext(): string | undefined {
+    if (!lesson.items.length) return undefined;
     if (lesson.id === CONFUSIONS) {
+      // Drop queued items whose pair was just cleared.
+      queue = queue.filter((id) => confusionIds.includes(id));
       if (!queue.length) {
         const p = nextPair(settings.confusions, lastPair);
         if (p) {
@@ -91,6 +94,8 @@
       session.done++;
       session.totalMs += ms;
       if (misses === 0) {
+        const cleared = clearConfusion(settings.confusions, current.id);
+        if (cleared !== settings.confusions) settings.confusions = cleared;
         session.firstTry++;
         session.streak++;
         session.best = Math.max(session.best, session.streak);
@@ -231,6 +236,7 @@
       {#if lesson.id === CONFUSIONS}
         <div class="confusions">
           <h3>Keys you mix up</h3>
+          <p class="hint-note muted">Each time you type a key right on the first try, one mistake for it is removed.</p>
           {#each topConfusions(settings.confusions, 10) as c (`${c.target}|${c.typed}`)}
             {@const target = ITEM_BY_ID.get(c.target)}
             {@const typed = ITEM_BY_ID.get(c.typed)}
@@ -245,6 +251,12 @@
           {/each}
         </div>
       {/if}
+    {:else if lesson.id === CONFUSIONS}
+      <div class="clear">
+        <div class="glyph">✓</div>
+        <p><b>No confusions left.</b></p>
+        <p class="muted">Keys you mix up in other lessons, or in Type, show up here.</p>
+      </div>
     {/if}
   </section>
 </div>
@@ -326,6 +338,21 @@
     letter-spacing: 0.1em;
     color: var(--muted);
     text-align: center;
+  }
+  .hint-note {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  .clear {
+    text-align: center;
+    padding: 40px 0;
+  }
+  .clear .glyph {
+    color: var(--ok);
+  }
+  .clear p {
+    margin: 4px 0;
   }
   .crow {
     display: grid;

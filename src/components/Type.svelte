@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { addConfusion } from '../confusions';
+  import { addConfusion, clearConfusion } from '../confusions';
   import { record } from '../drill';
   import { ITEM_BY_CHAR, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
@@ -102,6 +102,10 @@
       if (!startTs) startTs = now;
       // The first character has no meaningful timing, so only later ones feed Learn stats.
       if (pos > 0) settings.stats[nextItem.id] = record(settings.stats[nextItem.id], !missHere, now - lastTs);
+      if (!missHere) {
+        const cleared = clearConfusion(settings.confusions, nextItem.id);
+        if (cleared !== settings.confusions) settings.confusions = cleared;
+      }
       marks[pos] = missHere ? 'err' : 'ok';
       lastTs = now;
       pos++;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../src/confusions';
+import { addConfusion, clearConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../src/confusions';
 import { parseSettings } from '../src/storage';
 
 const seeded = (seed = 1) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -21,6 +21,18 @@ describe('confusions', () => {
     const c = { b: { c: 1 } };
     addConfusion(c, 'b', 'c');
     expect(c).toEqual({ b: { c: 1 } });
+  });
+
+  it('cancels one mistake per key when the target is typed right, and removes pairs at zero', () => {
+    const c = { b: { c: 2, n: 1 }, a: { e: 1 } };
+    expect(clearConfusion(c, 'b')).toEqual({ b: { c: 1 }, a: { e: 1 } });
+    expect(clearConfusion(clearConfusion(c, 'b'), 'b')).toEqual({ a: { e: 1 } });
+    expect(c).toEqual({ b: { c: 2, n: 1 }, a: { e: 1 } });
+  });
+
+  it('leaves the list alone when the target has no confusions', () => {
+    const c = { b: { c: 1 } };
+    expect(clearConfusion(c, 'c')).toBe(c);
   });
 
   it('ranks the most frequent confusions first, with a stable order for ties', () => {

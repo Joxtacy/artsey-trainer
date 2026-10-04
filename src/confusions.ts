@@ -13,6 +13,22 @@ export function addConfusion(c: Confusions, target: string, typed: string): Conf
   return { ...c, [target]: { ...row, [typed]: (row[typed] ?? 0) + 1 } };
 }
 
+/**
+ * Typing the target right first time cancels one recorded mistake for each key it was confused with.
+ * Pairs at zero are removed, so the list shrinks as you improve.
+ */
+export function clearConfusion(c: Confusions, target: string): Confusions {
+  const row = c[target];
+  if (!row) return c;
+  const rest = Object.fromEntries(
+    Object.entries(row)
+      .map(([typed, count]) => [typed, count - 1] as const)
+      .filter(([, count]) => count > 0),
+  );
+  const { [target]: _, ...others } = c;
+  return Object.keys(rest).length ? { ...others, [target]: rest } : others;
+}
+
 /** Most frequent first; ties keep a stable order so the list doesn't jump around. */
 export function topConfusions(c: Confusions, limit = Infinity): Confusion[] {
   const all = Object.entries(c).flatMap(([target, row]) =>
