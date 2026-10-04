@@ -5,6 +5,7 @@
   import { ITEM_BY_ID, LESSONS, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
   import { settings } from '../settings.svelte';
+  import Backup from './Backup.svelte';
   import Chord from './Chord.svelte';
 
   const CONFUSIONS = 'confusions';
@@ -174,6 +175,7 @@
     <button class="reset" onclick={resetProgress} onblur={() => (confirmingReset = false)}>
       {confirmingReset ? 'Click again to erase all progress' : 'Reset progress'}
     </button>
+    <Backup />
   </aside>
 
   <section class="stage">

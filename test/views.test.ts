@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { makeBackup } from '../src/backup';
+import { parseSettings } from '../src/storage';
 import Learn from '../src/components/Learn.svelte';
 import Type from '../src/components/Type.svelte';
 import { settings } from '../src/settings.svelte';
@@ -135,5 +137,76 @@ describe('Type: confusions', () => {
     typeLetter(wrong);
     typeLetter(wrong);
     expect(settings.confusions).toEqual({ [target]: { [wrong]: 1 } });
+  });
+});
+
+describe('Learn: export and import', () => {
+  const chooseFile = async (content: string) => {
+    const input = document.querySelector<HTMLInputElement>('.backup input[type=file]')!;
+    Object.defineProperty(input, 'files', { value: [new File([content], 'backup.json')], configurable: true });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(10);
+    flushSync();
+  };
+  const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === label)!;
+
+  it('exports the current progress as a dated JSON file', async () => {
+    settings.stats = { b: { n: 3, ok: 2, ms: 800 } };
+    render(Learn);
+    let blob: Blob | undefined;
+    URL.createObjectURL = vi.fn((b: Blob) => ((blob = b), 'blob:x'));
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      expect(this.download).toMatch(/^artsey-trainer-\d{4}-\d{2}-\d{2}\.json$/);
+    });
+    button('Export').click();
+    flushSync();
+    expect(click).toHaveBeenCalledOnce();
+    const saved = JSON.parse(await blob!.text());
+    expect(saved.format).toBe('artsey-trainer-backup');
+    expect(saved.settings.stats).toEqual({ b: { n: 3, ok: 2, ms: 800 } });
+    expect(text('.backup')).toContain('Progress exported.');
+    click.mockRestore();
+  });
+
+  it('asks before replacing progress, then imports it but keeps the current tab', async () => {
+    settings.stats = { a: { n: 1, ok: 1, ms: 500 } };
+    settings.view = 'learn';
+    render(Learn);
+    const imported = { ...parseSettings(null), view: 'chart' as const, side: 'left' as const, stats: { q: { n: 9, ok: 7, ms: 900 } }, confusions: { q: { z: 2 } } };
+    await chooseFile(makeBackup(imported));
+
+    expect(text('.confirm')).toContain('Now: 1 keys practised, 0 confusions');
+    expect(text('.confirm')).toContain('9 attempts, 2 confusions');
+    expect(settings.stats).toEqual({ a: { n: 1, ok: 1, ms: 500 } });
+
+    button('Replace').click();
+    flushSync();
+    expect(settings.stats).toEqual({ q: { n: 9, ok: 7, ms: 900 } });
+    expect(settings.confusions).toEqual({ q: { z: 2 } });
+    expect(settings.side).toBe('left');
+    expect(settings.view).toBe('learn');
+    expect(text('.backup')).toContain('Progress imported.');
+    settings.side = 'right';
+  });
+
+  it('cancelling an import changes nothing', async () => {
+    settings.stats = { a: { n: 1, ok: 1, ms: 500 } };
+    render(Learn);
+    await chooseFile(makeBackup({ ...parseSettings(null), stats: {} }));
+    button('Cancel').click();
+    flushSync();
+    expect(document.querySelector('.confirm')).toBeNull();
+    expect(settings.stats).toEqual({ a: { n: 1, ok: 1, ms: 500 } });
+  });
+
+  it('rejects a bad file with a message and keeps the progress', async () => {
+    settings.stats = { a: { n: 1, ok: 1, ms: 500 } };
+    render(Learn);
+    await chooseFile('{"hello": "world"}');
+    expect(text('.backup .error')).toContain('not an ARTSEY Trainer backup');
+    expect(text('.backup .error')).toContain('Your progress was not changed.');
+    expect(document.querySelector('.confirm')).toBeNull();
+    expect(settings.stats).toEqual({ a: { n: 1, ok: 1, ms: 500 } });
   });
 });

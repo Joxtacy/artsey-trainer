@@ -27,7 +27,7 @@ All layout data is in `src/layout.ts`. The base combos on the left side are a mi
 
 The app compares the character of each keystroke with the target character. If they are different, the app compares the US physical key code. For this reason, the app also works when your operating system uses a keyboard layout that is not US English.
 
-The app keeps your progress in the localStorage of the browser.
+The app keeps your progress in the localStorage of the browser. Each site address has its own progress. To move your progress to a different browser or site address, use **Export** and **Import** in the Learn view.
 
 ## Roadmap
 
