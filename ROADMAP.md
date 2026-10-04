@@ -6,7 +6,7 @@ When an item is done, move it to the "Done" section in the same commit.
 
 ## Next (priority: high)
 
-All high-priority items are done.
+- [#9 Support both layout versions: 0.8.1 (current) and 0.9.0 (beta)](https://github.com/Joxtacy/artsey-trainer/issues/9)
 
 ## Later (priority: low)
 
