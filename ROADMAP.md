@@ -6,7 +6,7 @@ When an item is done, move it to the "Done" section in the same commit.
 
 ## Next (priority: high)
 
-- [#3 Show progress over time and add spaced repetition](https://github.com/Joxtacy/artsey-trainer/issues/3)
+All high-priority items are done.
 
 ## Later (priority: low)
 
@@ -20,5 +20,6 @@ When an item is done, move it to the "Done" section in the same commit.
 - [x] [#1 Confusion insights: record and practice the chords that you confuse](https://github.com/Joxtacy/artsey-trainer/issues/1)
 - [x] [#4 Export and import progress as JSON](https://github.com/Joxtacy/artsey-trainer/issues/4)
 - [x] [#2 Type view: practice weak keys and slow chord transitions](https://github.com/Joxtacy/artsey-trainer/issues/2)
+- [x] [#3 Show progress over time and add spaced repetition](https://github.com/Joxtacy/artsey-trainer/issues/3)
 
 To see all open roadmap issues, use the [enhancement label](https://github.com/Joxtacy/artsey-trainer/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement).

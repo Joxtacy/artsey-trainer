@@ -23,6 +23,17 @@ describe('backup', () => {
     });
   });
 
+  it('keeps history and last-practised times', () => {
+    const s = {
+      ...progress(),
+      stats: { b: { n: 10, ok: 8, ms: 700, t: 1_790_000_000_000 } },
+      history: { '2026-10-04': { learn: { n: 3, ok: 2, ms: 900 }, type: { n: 50, ok: 48, ms: 30000, rounds: 1 }, lessons: { pairs: { n: 3, ok: 2, ms: 900 } } } },
+    };
+    const result = readBackup(makeBackup(s));
+    expect(result.ok && result.settings.history).toEqual(s.history);
+    expect(result.ok && result.settings.stats.b.t).toBe(1_790_000_000_000);
+  });
+
   it('names the file after the local date', () => {
     expect(backupFilename(new Date(2026, 0, 5, 23, 30))).toBe('artsey-trainer-2026-01-05.json');
   });
@@ -32,6 +43,7 @@ describe('backup', () => {
     const result = readBackup(backup(old));
     expect(result.ok && result.settings.confusions).toEqual({});
     expect(result.ok && result.settings.pairStats).toEqual({});
+    expect(result.ok && result.settings.history).toEqual({});
     expect(result.ok && result.settings.focusWeak).toBe(false);
     expect(result.ok && result.settings.stats).toEqual(progress().stats);
   });
@@ -46,6 +58,8 @@ describe('backup', () => {
     ['more first-try than attempts', backup({ ...progress(), stats: { b: { n: 1, ok: 2, ms: 1 } } }), 'damaged'],
     ['stats that are not objects', backup({ ...progress(), stats: [1, 2] }), 'damaged'],
     ['damaged transition stats', backup({ ...progress(), pairStats: { 't>h': { n: 1, ok: 1, ms: 'slow' } } }), 'damaged'],
+    ['history with a bad date', backup({ ...progress(), history: { yesterday: {} } }), 'damaged'],
+    ['history with damaged totals', backup({ ...progress(), history: { '2026-10-04': { learn: { n: 1, ok: 5, ms: 1 } } } }), 'damaged'],
     ['text confusion counts', backup({ ...progress(), confusions: { b: { c: 'two' } } }), 'damaged'],
   ])('rejects %s', (_, text, message) => {
     const result = readBackup(text);

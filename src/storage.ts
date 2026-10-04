@@ -1,5 +1,6 @@
 import type { Confusions } from './confusions';
 import type { Stats } from './drill';
+import type { History } from './history';
 import type { Side } from './layout';
 
 export type HintMode = 'always' | 'delay' | 'never';
@@ -9,7 +10,7 @@ export interface Settings {
   hint: HintMode;
   hintDelay: number;
   lesson: string;
-  view: 'learn' | 'type' | 'chart';
+  view: 'learn' | 'type' | 'chart' | 'progress';
   punctuation: boolean;
   numbers: boolean;
   wordCount: number;
@@ -18,6 +19,8 @@ export interface Settings {
   /** Timing of each character-to-character transition in Type, keyed "from>to". */
   pairStats: Stats;
   focusWeak: boolean;
+  /** Daily practice summaries for the Progress view. */
+  history: History;
 }
 
 const KEY = 'artsey-trainer:v1';
@@ -36,6 +39,7 @@ function defaults(): Settings {
     confusions: {},
     pairStats: {},
     focusWeak: false,
+    history: {},
   };
 }
 

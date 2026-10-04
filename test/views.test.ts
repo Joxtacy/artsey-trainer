@@ -2,10 +2,19 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBackup } from '../src/backup';
+import { dayKey, logLearn, logTypeRound } from '../src/history';
 import { parseSettings } from '../src/storage';
 import Learn from '../src/components/Learn.svelte';
+import Progress from '../src/components/Progress.svelte';
 import Type from '../src/components/Type.svelte';
 import { settings } from '../src/settings.svelte';
+
+// jsdom has no ResizeObserver (used by bind:clientWidth); every browser the app targets does.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
 
 const press = (key: string, code: string, shiftKey = false) => {
   document.body.dispatchEvent(new KeyboardEvent('keydown', { key, code, shiftKey, bubbles: true, cancelable: true }));
@@ -16,7 +25,7 @@ const text = (sel: string) => document.querySelector(sel)?.textContent?.replace(
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let app: ReturnType<typeof mount> | undefined;
-const render = (c: typeof Learn | typeof Type) => {
+const render = (c: typeof Learn | typeof Type | typeof Progress) => {
   app = mount(c, { target: document.body });
   flushSync();
 };
@@ -26,6 +35,7 @@ beforeEach(() => {
   settings.confusions = {};
   settings.pairStats = {};
   settings.focusWeak = false;
+  settings.history = {};
   settings.lesson = 'pairs';
   settings.hint = 'never';
   settings.side = 'right';
@@ -246,5 +256,91 @@ describe('Learn: export and import', () => {
     expect(text('.backup .error')).toContain('Your progress was not changed.');
     expect(document.querySelector('.confirm')).toBeNull();
     expect(settings.stats).toEqual({ a: { n: 1, ok: 1, ms: 500 } });
+  });
+});
+
+describe('Progress', () => {
+  const today = dayKey(new Date());
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('logs each Learn answer under today and the current lesson', () => {
+    render(Learn);
+    typeLetter(text('.glyph').toLowerCase());
+    expect(settings.history[today]).toMatchObject({ learn: { n: 1, ok: 1 }, lessons: { pairs: { n: 1, ok: 1 } } });
+  });
+
+  it('logs a completed Type round', () => {
+    render(Type);
+    [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
+    flushSync();
+    const area = document.querySelector('textarea')!;
+    area.value = 'hi';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
+    flushSync();
+    typeLetter('h');
+    typeLetter('x');
+    typeLetter('i');
+    expect(settings.history[today].type).toMatchObject({ n: 2, ok: 1, rounds: 1 });
+  });
+
+  it('shows an empty state before any practice', () => {
+    render(Progress);
+    expect(text('.empty')).toContain('progress shows up here');
+    expect(text('.tiles')).toContain('Days practised 0');
+  });
+
+  it('shows tiles, both charts, the table, and lesson trends', () => {
+    const now = Date.now();
+    let h = {};
+    for (let i = 0; i < 4; i++) h = logLearn(h, 'pairs', i < 2, 500, now - 9 * DAY);
+    for (let i = 0; i < 4; i++) h = logLearn(h, 'pairs', i < 3, 500, now - 1 * DAY);
+    h = logTypeRound(h, 100, 90, 60_000, now);
+    settings.history = h;
+    settings.stats = { b: { n: 20, ok: 20, ms: 400, t: now - 30 * DAY } };
+    render(Progress);
+
+    expect(text('.tiles')).toContain('Days practised 3');
+    expect(text('.tiles')).toContain('Latest speed 20');
+    expect(text('.tiles')).toContain('Due for review 1');
+    expect(document.querySelectorAll('figure.chart')).toHaveLength(2);
+    const legends = [...document.querySelectorAll('figure.chart')].map((f) => [...f.querySelectorAll('.legend .key')].map((k) => k.textContent));
+    // One series needs no legend; two series always get one.
+    expect(legends).toEqual([[], ['Learn', 'Type']]);
+    expect(document.querySelectorAll('details tbody tr')).toHaveLength(3);
+    expect(text('.trends tbody')).toContain('Two-key letters');
+    expect(text('.trends tbody')).toContain('▲ 25 points better');
+  });
+
+  it('reads chart values with the keyboard', () => {
+    settings.history = logTypeRound({}, 100, 90, 60_000, Date.now());
+    render(Progress);
+    const svg = document.querySelector<SVGSVGElement>('figure.chart svg')!;
+    svg.dispatchEvent(new FocusEvent('focus'));
+    flushSync();
+    expect(text('.tip')).toContain('20 wpm');
+    svg.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    flushSync();
+    expect(text('.tip')).toContain('– Type');
+  });
+
+  it('changes the date range for tiles and charts', () => {
+    settings.history = logLearn({}, 'home', true, 500, Date.now() - 20 * DAY);
+    render(Progress);
+    expect(text('.tiles')).toContain('Days practised 1');
+    [...document.querySelectorAll<HTMLButtonElement>('.filters button')].find((b) => b.textContent === 'Last 14 days')!.click();
+    flushSync();
+    expect(text('.tiles')).toContain('Days practised 0');
+  });
+
+  it('is cleared by "Reset progress"', () => {
+    settings.history = logLearn({}, 'home', true, 500);
+    render(Learn);
+    const reset = document.querySelector<HTMLButtonElement>('.reset')!;
+    reset.click();
+    reset.click();
+    flushSync();
+    expect(settings.history).toEqual({});
   });
 });

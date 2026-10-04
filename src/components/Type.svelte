@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { addConfusion, clearConfusion } from '../confusions';
   import { record } from '../drill';
+  import { logTypeRound } from '../history';
   import { pairKey, pairLabel, slowestPairs, weakestLetters, wordWeigher } from '../focus';
   import { ITEM_BY_CHAR, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
@@ -133,7 +134,11 @@
       missedHere = new Set();
       wrong = undefined;
       if (pos < text.length) scheduleHint();
-      else clearTimeout(hintTimer);
+      else {
+        clearTimeout(hintTimer);
+        const ok = marks.filter((m) => m === 'ok').length;
+        settings.history = logTypeRound(settings.history, text.length, ok, lastTs - startTs);
+      }
     } else {
       missHere = true;
       wrong = identify(e);

@@ -10,6 +10,9 @@
   --ok: #3ecf8e;
   --bad: #f06a6a;
   --on-accent: #0b0e12;
+  /* Chart series, checked with the dataviz palette validator against --panel in each theme. */
+  --series-learn: #1aa3b8;
+  --series-type: #c98500;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: dark;
 }
@@ -27,6 +30,8 @@
     --ok: #1fa86b;
     --bad: #d94848;
     --on-accent: #ffffff;
+    --series-learn: #0a9ab1;
+    --series-type: #b87800;
     color-scheme: light;
   }
 }

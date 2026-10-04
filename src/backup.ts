@@ -1,5 +1,6 @@
 import type { Confusions } from './confusions';
 import type { Stats } from './drill';
+import type { History } from './history';
 import { parseSettings, type Settings } from './storage';
 
 const FORMAT = 'artsey-trainer-backup';
@@ -31,7 +32,25 @@ const isCount = (x: unknown): x is number => typeof x === 'number' && Number.isF
 function validStats(x: unknown): x is Stats {
   return (
     isObject(x) &&
-    Object.values(x).every((s) => isObject(s) && isCount(s.n) && isCount(s.ok) && s.ok <= s.n && isCount(s.ms))
+    Object.values(x).every(
+      (s) => isObject(s) && isCount(s.n) && isCount(s.ok) && s.ok <= s.n && isCount(s.ms) && (s.t === undefined || isCount(s.t)),
+    )
+  );
+}
+
+const isTotals = (x: unknown) => isObject(x) && isCount(x.n) && isCount(x.ok) && x.ok <= x.n && isCount(x.ms);
+
+function validHistory(x: unknown): x is History {
+  return (
+    isObject(x) &&
+    Object.entries(x).every(
+      ([day, log]) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+        isObject(log) &&
+        (log.learn === undefined || isTotals(log.learn)) &&
+        (log.type === undefined || (isTotals(log.type) && isObject(log.type) && isCount(log.type.rounds))) &&
+        (log.lessons === undefined || (isObject(log.lessons) && Object.values(log.lessons).every(isTotals))),
+    )
   );
 }
 
@@ -47,7 +66,7 @@ function withValidPreferences(s: Settings): Settings {
     hint: s.hint === 'always' || s.hint === 'delay' || s.hint === 'never',
     hintDelay: isCount(s.hintDelay),
     lesson: typeof s.lesson === 'string',
-    view: s.view === 'learn' || s.view === 'type' || s.view === 'chart',
+    view: s.view === 'learn' || s.view === 'type' || s.view === 'chart' || s.view === 'progress',
     punctuation: typeof s.punctuation === 'boolean',
     numbers: typeof s.numbers === 'boolean',
     focusWeak: typeof s.focusWeak === 'boolean',
@@ -91,7 +110,12 @@ export function readBackup(text: string): BackupResult {
     return { ok: false, error: 'This backup was made by a newer version of the app. Reload the app and try again.' };
   }
   const settings = withValidPreferences(parseSettings(JSON.stringify(data.settings)));
-  if (!validStats(settings.stats) || !validStats(settings.pairStats) || !validConfusions(settings.confusions)) {
+  if (
+    !validStats(settings.stats) ||
+    !validStats(settings.pairStats) ||
+    !validConfusions(settings.confusions) ||
+    !validHistory(settings.history)
+  ) {
     return { ok: false, error: 'The progress data in this backup is damaged.' };
   }
   const exportedAt = typeof data.exportedAt === 'string' ? data.exportedAt : undefined;

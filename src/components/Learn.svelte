@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { addConfusion, clearConfusion, confusedPairs, confusionItems, nextPair, topConfusions } from '../confusions';
   import { mastery, pick, record } from '../drill';
+  import { logLearn } from '../history';
   import { ITEM_BY_ID, LESSONS, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
   import { settings } from '../settings.svelte';
@@ -92,6 +93,7 @@
     if (matches(e, current.match)) {
       const ms = performance.now() - start;
       settings.stats[current.id] = record(settings.stats[current.id], misses === 0, ms);
+      settings.history = logLearn(settings.history, lesson.id, misses === 0, ms);
       session.done++;
       session.totalMs += ms;
       if (misses === 0) {
@@ -135,6 +137,7 @@
     settings.stats = {};
     settings.confusions = {};
     settings.pairStats = {};
+    settings.history = {};
     confirmingReset = false;
     next();
   }

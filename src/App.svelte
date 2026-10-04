@@ -1,6 +1,7 @@
 <script lang="ts">
   import Chart from './components/Chart.svelte';
   import Learn from './components/Learn.svelte';
+  import Progress from './components/Progress.svelte';
   import Type from './components/Type.svelte';
   import { settings } from './settings.svelte';
 
@@ -8,6 +9,7 @@
     { id: 'learn', label: 'Learn' },
     { id: 'type', label: 'Type' },
     { id: 'chart', label: 'Chart' },
+    { id: 'progress', label: 'Progress' },
   ] as const;
 
   let focused = $state(document.hasFocus());
@@ -30,7 +32,7 @@
       <button class:active={settings.side === 'left'} onclick={() => (settings.side = 'left')}>Left</button>
       <button class:active={settings.side === 'right'} onclick={() => (settings.side = 'right')}>Right</button>
     </div>
-    {#if settings.view !== 'chart'}
+    {#if settings.view === 'learn' || settings.view === 'type'}
       <label>
         Hints
         <select bind:value={settings.hint}>
@@ -48,7 +50,7 @@
   </div>
 </header>
 
-{#if !focused}
+{#if !focused && settings.view !== 'progress'}
   <button class="blur" onclick={() => window.focus()}>Window not focused. Click here, then type on your keyboard.</button>
 {/if}
 
@@ -57,6 +59,8 @@
     <Learn />
   {:else if settings.view === 'type'}
     <Type />
+  {:else if settings.view === 'progress'}
+    <Progress />
   {:else}
     <Chart />
   {/if}
