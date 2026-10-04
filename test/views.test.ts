@@ -24,6 +24,8 @@ const render = (c: typeof Learn | typeof Type) => {
 beforeEach(() => {
   settings.stats = {};
   settings.confusions = {};
+  settings.pairStats = {};
+  settings.focusWeak = false;
   settings.lesson = 'pairs';
   settings.hint = 'never';
   settings.side = 'right';
@@ -117,6 +119,42 @@ describe('Learn: confusions', () => {
     expect(afterMiss).toBeGreaterThan(0);
     typeLetter(target);
     expect(settings.confusions[target]?.[wrong]).toBe(afterMiss);
+  });
+});
+
+describe('Type: weak keys and transitions', () => {
+  const typeNext = () => {
+    const ch = document.querySelector('.c.cur')!.textContent!;
+    if (ch === '·') press(' ', 'Space');
+    else typeLetter(ch);
+    return ch === '·' ? 'space' : ch;
+  };
+
+  it('records the transition between consecutive characters', () => {
+    render(Type);
+    const a = typeNext();
+    const b = typeNext();
+    expect(Object.keys(settings.pairStats)).toEqual([`${a}>${b}`]);
+    expect(settings.pairStats[`${a}>${b}`]).toMatchObject({ n: 1, ok: 1 });
+  });
+
+  it('shows the focus line only with "Focus on weak keys" on', () => {
+    settings.stats = { q: { n: 20, ok: 5, ms: 3000 } };
+    render(Type);
+    expect(document.querySelector('.focus')).toBeNull();
+    const box = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('Focus on weak keys'))!.querySelector('input')!;
+    box.click();
+    flushSync();
+    expect(settings.focusWeak).toBe(true);
+    expect(text('.focus')).toMatch(/^Weakest keys: [A-Z ]+/);
+    expect(text('.focus')).toContain('Slow transitions show up after a few rounds.');
+  });
+
+  it('lists the slowest transitions once there is enough data', () => {
+    settings.focusWeak = true;
+    settings.pairStats = { 'a>b': { n: 5, ok: 5, ms: 300 }, 'b>c': { n: 5, ok: 5, ms: 300 }, 't>h': { n: 5, ok: 5, ms: 900 } };
+    render(Type);
+    expect(text('.focus')).toContain('Slowest transitions: T→H');
   });
 });
 

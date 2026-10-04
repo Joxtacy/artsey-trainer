@@ -134,6 +134,7 @@
     }
     settings.stats = {};
     settings.confusions = {};
+    settings.pairStats = {};
     confirmingReset = false;
     next();
   }

@@ -22,17 +22,39 @@ export interface TextOptions {
   count: number;
   punctuation: boolean;
   numbers: boolean;
+  /** Relative chance of each word; without it every word is equally likely. */
+  weigh?: (word: string) => number;
   rng?: () => number;
 }
 
-export function generateText({ count, punctuation, numbers, rng = Math.random }: TextOptions): string {
-  const any = <T>(xs: T[]) => xs[Math.floor(rng() * xs.length)];
+/** Picks from `words` in proportion to `weigh`, falling back to a uniform pick. */
+function chooser(words: string[], rng: () => number, weigh?: (word: string) => number): () => string {
+  if (!weigh) return () => words[Math.floor(rng() * words.length)];
+  const cumulative: number[] = [];
+  let total = 0;
+  for (const w of words) cumulative.push((total += Math.max(weigh(w), 0)));
+  return () => {
+    const r = rng() * total;
+    let lo = 0;
+    let hi = cumulative.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cumulative[mid] > r) hi = mid;
+      else lo = mid + 1;
+    }
+    return words[lo];
+  };
+}
+
+export function generateText({ count, punctuation, numbers, weigh, rng = Math.random }: TextOptions): string {
+  const word = chooser(WORDS, rng, weigh);
+  const contraction = chooser(CONTRACTIONS, rng, weigh);
   const out: string[] = [];
   for (let i = 0; i < count; i++) {
     let w: string;
     if (numbers && rng() < 0.12) w = String(Math.floor(rng() * 1000));
-    else if (punctuation && rng() < 0.08) w = any(CONTRACTIONS);
-    else w = any(WORDS);
+    else if (punctuation && rng() < 0.08) w = contraction();
+    else w = word();
     if (punctuation && i < count - 1) {
       const r = rng();
       if (r < 0.1) w += ',';

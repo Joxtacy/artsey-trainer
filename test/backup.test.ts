@@ -31,6 +31,8 @@ describe('backup', () => {
     const { confusions: _, ...old } = progress();
     const result = readBackup(backup(old));
     expect(result.ok && result.settings.confusions).toEqual({});
+    expect(result.ok && result.settings.pairStats).toEqual({});
+    expect(result.ok && result.settings.focusWeak).toBe(false);
     expect(result.ok && result.settings.stats).toEqual(progress().stats);
   });
 
@@ -43,6 +45,7 @@ describe('backup', () => {
     ['negative counts', backup({ ...progress(), stats: { b: { n: -1, ok: 0, ms: 1 } } }), 'damaged'],
     ['more first-try than attempts', backup({ ...progress(), stats: { b: { n: 1, ok: 2, ms: 1 } } }), 'damaged'],
     ['stats that are not objects', backup({ ...progress(), stats: [1, 2] }), 'damaged'],
+    ['damaged transition stats', backup({ ...progress(), pairStats: { 't>h': { n: 1, ok: 1, ms: 'slow' } } }), 'damaged'],
     ['text confusion counts', backup({ ...progress(), confusions: { b: { c: 'two' } } }), 'damaged'],
   ])('rejects %s', (_, text, message) => {
     const result = readBackup(text);

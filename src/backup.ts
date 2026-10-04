@@ -50,6 +50,7 @@ function withValidPreferences(s: Settings): Settings {
     view: s.view === 'learn' || s.view === 'type' || s.view === 'chart',
     punctuation: typeof s.punctuation === 'boolean',
     numbers: typeof s.numbers === 'boolean',
+    focusWeak: typeof s.focusWeak === 'boolean',
     wordCount: isCount(s.wordCount) && s.wordCount > 0,
   };
   const fixed = { ...s };
@@ -90,7 +91,7 @@ export function readBackup(text: string): BackupResult {
     return { ok: false, error: 'This backup was made by a newer version of the app. Reload the app and try again.' };
   }
   const settings = withValidPreferences(parseSettings(JSON.stringify(data.settings)));
-  if (!validStats(settings.stats) || !validConfusions(settings.confusions)) {
+  if (!validStats(settings.stats) || !validStats(settings.pairStats) || !validConfusions(settings.confusions)) {
     return { ok: false, error: 'The progress data in this backup is damaged.' };
   }
   const exportedAt = typeof data.exportedAt === 'string' ? data.exportedAt : undefined;

@@ -15,6 +15,9 @@ export interface Settings {
   wordCount: number;
   stats: Stats;
   confusions: Confusions;
+  /** Timing of each character-to-character transition in Type, keyed "from>to". */
+  pairStats: Stats;
+  focusWeak: boolean;
 }
 
 const KEY = 'artsey-trainer:v1';
@@ -31,6 +34,8 @@ function defaults(): Settings {
     wordCount: 20,
     stats: {},
     confusions: {},
+    pairStats: {},
+    focusWeak: false,
   };
 }
 

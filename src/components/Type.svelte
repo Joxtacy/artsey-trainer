@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { addConfusion, clearConfusion } from '../confusions';
   import { record } from '../drill';
+  import { pairKey, pairLabel, slowestPairs, weakestLetters, wordWeigher } from '../focus';
   import { ITEM_BY_CHAR, describeChord, type Item } from '../layout';
   import { identify, isIgnorable, matches, shouldHandle } from '../match';
   import { settings } from '../settings.svelte';
@@ -37,6 +38,9 @@
     return out;
   });
 
+  const weakest = $derived(weakestLetters(settings.stats));
+  const slowPairs = $derived(slowestPairs(settings.pairStats, 3));
+
   const wpm = $derived(pos > 1 && lastTs > startTs ? Math.round(pos / 5 / ((lastTs - startTs) / 60000)) : 0);
   const accuracy = $derived(pos ? Math.round((marks.filter((m) => m === 'ok').length / pos) * 100) : 100);
   const seconds = $derived(startTs ? ((lastTs - startTs) / 1000).toFixed(1) : '0.0');
@@ -61,7 +65,14 @@
 
   function newText() {
     usingCustom = false;
-    reset(generateText({ count: settings.wordCount, punctuation: settings.punctuation, numbers: settings.numbers }));
+    reset(
+      generateText({
+        count: settings.wordCount,
+        punctuation: settings.punctuation,
+        numbers: settings.numbers,
+        weigh: settings.focusWeak ? wordWeigher(settings.stats, settings.pairStats) : undefined,
+      }),
+    );
   }
 
   function restart() {
@@ -81,6 +92,7 @@
     void settings.wordCount;
     void settings.punctuation;
     void settings.numbers;
+    void settings.focusWeak;
     void settings.hint;
     untrack(newText);
   });
@@ -101,7 +113,15 @@
     if (matches(e, nextItem.match)) {
       if (!startTs) startTs = now;
       // The first character has no meaningful timing, so only later ones feed Learn stats.
-      if (pos > 0) settings.stats[nextItem.id] = record(settings.stats[nextItem.id], !missHere, now - lastTs);
+      if (pos > 0) {
+        settings.stats[nextItem.id] = record(settings.stats[nextItem.id], !missHere, now - lastTs);
+        // The same gap, filed under the transition from the previous character.
+        const prev = ITEM_BY_CHAR.get(text[pos - 1]);
+        if (prev) {
+          const key = pairKey(prev.id, nextItem.id);
+          settings.pairStats[key] = record(settings.pairStats[key], !missHere, now - lastTs);
+        }
+      }
       if (!missHere) {
         const cleared = clearConfusion(settings.confusions, nextItem.id);
         if (cleared !== settings.confusions) settings.confusions = cleared;
@@ -138,6 +158,9 @@
     </label>
     <label><input type="checkbox" bind:checked={settings.punctuation} /> Punctuation</label>
     <label><input type="checkbox" bind:checked={settings.numbers} /> Numbers</label>
+    <label title="Pick words with the keys and transitions you are weakest at">
+      <input type="checkbox" bind:checked={settings.focusWeak} /> Focus on weak keys
+    </label>
     <button onclick={newText}>New text</button>
     <button onclick={() => (editing = !editing)}>{editing ? 'Cancel' : 'Custom text…'}</button>
   </div>
@@ -147,6 +170,18 @@
       <textarea bind:value={custom} rows="4" placeholder="Paste any text. It is lowercased, and characters the layout can't type are dropped."></textarea>
       <button class="primary" onclick={useCustom} disabled={!sanitize(custom)}>Practice this text</button>
     </div>
+  {/if}
+
+  {#if settings.focusWeak && !editing}
+    <p class="focus">
+      Weakest keys: <b>{weakest.map((l) => l.toUpperCase()).join(' ')}</b>
+      ·
+      {#if slowPairs.length}
+        Slowest transitions: <b>{slowPairs.map((p) => pairLabel(p.from, p.to)).join(', ')}</b>
+      {:else}
+        <span class="muted">Slow transitions show up after a few rounds.</span>
+      {/if}
+    </p>
   {/if}
 
   <div class="text" class:done aria-live="off">
@@ -175,6 +210,14 @@
   {#if done}
     <div class="result">
       <p>Done! <b>{wpm} wpm</b> at <b>{accuracy}%</b> accuracy.</p>
+      {#if slowPairs.length}
+        <p class="slow">
+          Slowest transitions:
+          {#each slowPairs as p (p.key)}
+            <span class="chip"><b>{pairLabel(p.from, p.to)}</b> {p.ms}ms</span>
+          {/each}
+        </p>
+      {/if}
       <p class="muted">Press <b>Enter</b> (A + E) or click below for the next round.</p>
       <button class="primary" onclick={restart}>{usingCustom ? 'Again' : 'Next text'}</button>
     </div>
@@ -298,6 +341,27 @@
   }
   .result p {
     margin: 0;
+  }
+  .focus {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .focus b {
+    color: var(--text);
+  }
+  .slow {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .chip {
+    background: var(--key);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.85rem;
   }
   .instr {
     color: var(--accent);
