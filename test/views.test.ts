@@ -499,3 +499,52 @@ describe('layout versions', () => {
     expect(text('.hint .instr')).toBe('A + Y');
   });
 });
+
+describe('Learn: nav layer', () => {
+  const pressKey = (key: string) => {
+    const e = new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true });
+    document.body.dispatchEvent(e);
+    flushSync();
+    return e;
+  };
+  const pick = (label: string) => {
+    [...document.querySelectorAll<HTMLButtonElement>('.tile')].find((t) => t.textContent?.trim() === label)!.click();
+    flushSync();
+  };
+
+  it('reminds you to lock the layer, with the lock combo for your side', () => {
+    settings.lesson = 'nav';
+    render(Learn);
+    expect(text('.navnote')).toContain('Lock the nav layer first');
+    expect(text('.navnote')).toContain('R + E + I');
+  });
+
+  it('drills nav keys and stops the page from scrolling', () => {
+    settings.lesson = 'nav';
+    render(Learn);
+    pick('↓');
+    const e = pressKey('ArrowDown');
+    expect(e.defaultPrevented).toBe(true);
+    expect(settings.stats['nav:Down']).toMatchObject({ n: 1, ok: 1 });
+  });
+
+  it('explains a letter as "not locked" instead of counting a miss', () => {
+    settings.lesson = 'nav';
+    render(Learn);
+    pick('Home');
+    typeLetter('r');
+    expect(text('.feedback')).toContain('You typed R, so the nav layer is not on');
+    expect(settings.confusions).toEqual({});
+    pressKey('Home');
+    expect(settings.stats['nav:Home']).toMatchObject({ n: 1, ok: 1 });
+  });
+
+  it('shows left-hand positions on the left side', () => {
+    settings.lesson = 'nav';
+    settings.side = 'left';
+    settings.hint = 'always';
+    render(Learn);
+    pick('Home');
+    expect(text('.instr')).toBe('Nav layer: T');
+  });
+});

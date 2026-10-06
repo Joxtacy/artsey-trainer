@@ -34,6 +34,8 @@
   let misses = $state(0);
   let showHint = $state(false);
   let wrong = $state<Item>();
+  /** In the nav lesson: a key that shows the nav layer is not locked yet. */
+  let notLocked = $state<Item>();
   let flash = $state<'ok' | 'bad'>();
   let session = $state({ done: 0, firstTry: 0, streak: 0, best: 0, totalMs: 0 });
 
@@ -47,6 +49,7 @@
   let hintTimer: ReturnType<typeof setTimeout> | undefined;
 
   const current = $derived(currentId ? L.byId.get(currentId) : undefined);
+  const lockChord = $derived(L.item('locknav')?.chords[settings.side]);
   const chord = $derived(current?.chords[settings.side]);
 
   function scheduleHint() {
@@ -78,6 +81,7 @@
     missedHere = new Set();
     misses = 0;
     wrong = undefined;
+    notLocked = undefined;
     locked = false;
     start = performance.now();
     scheduleHint();
@@ -122,9 +126,16 @@
         next();
       }, 140);
     } else {
+      const typed = identify(e, L);
+      // A letter or symbol in the nav lesson means the layer is not locked: explain, don't count a miss.
+      if (lesson.id === 'nav' && typed && !typed.base.startsWith('nav:')) {
+        notLocked = typed;
+        return;
+      }
+      notLocked = undefined;
       misses++;
       session.streak = 0;
-      wrong = identify(e, L);
+      wrong = typed;
       if (wrong && !missedHere.has(wrong.id)) {
         missedHere.add(wrong.id);
         settings.confusions = addConfusion(settings.confusions, current.id, wrong.id);
@@ -213,8 +224,19 @@
         {/if}
       </div>
 
+      {#if lesson.id === 'nav' && lockChord}
+        <p class="navnote">
+          Lock the nav layer first: <Chord side={settings.side} chord={lockChord} />
+          <b>{describeChord(lockChord)}</b>. Press it again to unlock when you finish.
+        </p>
+      {/if}
+
       <div class="feedback">
-        {#if wrong}
+        {#if notLocked && lockChord}
+          <span>You typed <b>{notLocked.label}</b>, so the nav layer is not on. Lock it with</span>
+          <Chord side={settings.side} chord={lockChord} />
+          <span class="muted">{describeChord(lockChord)}</span>
+        {:else if wrong}
           <span>You typed <b>{wrong.label}</b></span>
           <Chord side={settings.side} chord={wrong.chords[settings.side]} />
           <span class="muted">{describeChord(wrong.chords[settings.side])}</span>
@@ -355,6 +377,15 @@
     letter-spacing: 0.1em;
     color: var(--muted);
     text-align: center;
+  }
+  .navnote {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 0;
+    color: var(--muted);
   }
   .hint-note {
     margin: 0 0 6px;

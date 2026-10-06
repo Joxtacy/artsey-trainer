@@ -21,6 +21,8 @@ export interface Chord {
   hold?: Key;
   /** Press one-shot Shift (R + T + S + E) first, then this chord. */
   shift?: boolean;
+  /** Only works while this lock layer is on (the nav layer). */
+  layer?: 'nav';
 }
 
 /** How a keystroke is recognised: by `key`, or by US physical `code` (+ shift) as a fallback for non-US OS layouts. */
@@ -75,6 +77,8 @@ export interface Layout {
   baseItems: Item[];
   layerItems: Item[];
   shiftedItems: Item[];
+  /** Keys of the locked nav layer: arrows, Home, End, PgUp, PgDn. */
+  navItems: Item[];
   items: Item[];
   layers: Layer[];
   lessons: Lesson[];
@@ -299,6 +303,18 @@ const SHIFTED: [char: string, base: string, id: string, name: string][] = [
 
 const CHAR_OF: Record<string, string> = { space: ' ' };
 
+/** Nav layer outputs (as named in the layer cells) and the key the browser receives. */
+const NAV_KEYS: Record<string, { key: string; label: string; name: string }> = {
+  Up: { key: 'ArrowUp', label: '↑', name: 'Up' },
+  Down: { key: 'ArrowDown', label: '↓', name: 'Down' },
+  Left: { key: 'ArrowLeft', label: '←', name: 'Left' },
+  Right: { key: 'ArrowRight', label: '→', name: 'Right' },
+  Home: { key: 'Home', label: 'Home', name: 'Home' },
+  End: { key: 'End', label: 'End', name: 'End' },
+  PgUp: { key: 'PageUp', label: 'PgUp', name: 'Page up' },
+  PgDn: { key: 'PageDown', label: 'PgDn', name: 'Page down' },
+};
+
 function layerChord(layer: Layer, side: Side, output: string): Chord | undefined {
   const combo = layer.combos?.find(([o]) => o === output);
   if (combo) return { press: keys(combo[1]), hold: layer.hold };
@@ -352,7 +368,23 @@ function buildLayout(def: LayoutDef, reference?: Layout): Layout {
     };
   });
 
-  const items = [...baseItems, ...layerItems, ...shiftedItems];
+  // The nav layer is locked with a combo, so its keys are single presses while it is on.
+  const navLayer = def.layers.find((l) => l.id === 'nav');
+  const navItems: Item[] = navLayer
+    ? Object.entries(NAV_KEYS).map(([out, k]) => {
+        const chord = (side: Side): Chord => ({ press: [GRID[side][navLayer.cells[side].indexOf(out)]], layer: 'nav' });
+        return {
+          id: `nav:${out}`,
+          base: `nav:${out}`,
+          label: k.label,
+          name: k.name,
+          match: { key: k.key, code: k.key },
+          chords: { left: chord('left'), right: chord('right') },
+        };
+      })
+    : [];
+
+  const items = [...baseItems, ...layerItems, ...shiftedItems, ...navItems];
 
   // Share stats with the reference version only where the chord is the same on both hands.
   if (reference) {
@@ -396,6 +428,12 @@ function buildLayout(def: LayoutDef, reference?: Layout): Layout {
       desc: `One-shot Shift, then a key: ${shiftedItems.map((i) => i.label).join(' ')}`,
       items: shiftedItems.map((i) => i.id),
     },
+    {
+      id: 'nav',
+      title: 'Nav layer',
+      desc: 'Lock it, then: ↑ ↓ ← → Home End PgUp PgDn',
+      items: navItems.map((i) => i.id),
+    },
   ];
 
   return {
@@ -403,6 +441,7 @@ function buildLayout(def: LayoutDef, reference?: Layout): Layout {
     baseItems,
     layerItems,
     shiftedItems,
+    navItems,
     items,
     layers: def.layers,
     lessons,
@@ -420,6 +459,7 @@ export const LAYOUTS: Record<Version, Layout> = {
 
 export function describeChord(c: Chord): string {
   const press = c.press.map((k) => k.toUpperCase()).join(' + ');
+  if (c.layer === 'nav') return `Nav layer: ${press}`;
   const main = c.hold ? `Hold ${c.hold.toUpperCase()}, then ${press}` : press;
   return c.shift ? `Shift (R + T + S + E), then ${main.replace(/^Hold/, 'hold')}` : main;
 }

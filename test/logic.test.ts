@@ -65,8 +65,9 @@ describe('explain', () => {
     expect(explain(ev('Meta', 'MetaLeft'), 'right', L)).toMatchObject({ label: 'Gui', chord: { press: ['s', 'y'] } });
   });
   it('explains locked nav keys per side', () => {
-    expect(explain(ev('Home', 'Home'), 'right', L)?.chord).toEqual({ press: ['a'] });
-    expect(explain(ev('Home', 'Home'), 'left', L)?.chord).toEqual({ press: ['t'] });
+    expect(explain(ev('Home', 'Home'), 'right', L)).toMatchObject({ label: 'Home', chord: { press: ['a'], layer: 'nav' } });
+    expect(explain(ev('Home', 'Home'), 'left', L)?.chord).toEqual({ press: ['t'], layer: 'nav' });
+    expect(explain(ev('ArrowUp', 'ArrowUp'), 'right', L)).toMatchObject({ label: '↑', name: 'Up', letter: false, symbol: false });
   });
   it('returns undefined for unknown keys', () => {
     expect(explain(ev('F5', 'F5'), 'right', L)).toBeUndefined();

@@ -1,5 +1,4 @@
 import type { Chord, Item, Layout, Match, Side } from './layout';
-import { GRID } from './layout';
 
 export interface KeyLike {
   key: string;
@@ -52,24 +51,13 @@ const MODIFIER_ITEM: Record<string, string> = {
   CapsLock: 'caps',
 };
 
-const NAV_OUTPUT: Record<string, string> = {
-  ArrowUp: 'Up',
-  ArrowDown: 'Down',
-  ArrowLeft: 'Left',
-  ArrowRight: 'Right',
-  Home: 'Home',
-  End: 'End',
-  PageUp: 'PgUp',
-  PageDown: 'PgDn',
-};
-
 function itemName(item: Item, layout: Layout): string {
   if (item.name) return item.name;
   const layer = layout.layers.find((l) => item.base.startsWith(`${l.id}:`));
   return layer ? `${layer.title} layer` : 'Letter';
 }
 
-/** Explain any keystroke as the chord that produced it, including modifiers and locked-nav keys. */
+/** Explain any keystroke as the chord that produced it, including modifiers and nav-layer keys. */
 export function explain(e: KeyLike, side: Side, layout: Layout): Explained | undefined {
   const mod = MODIFIER_ITEM[e.key];
   const item = mod ? layout.item(mod) : identify(e, layout);
@@ -79,12 +67,6 @@ export function explain(e: KeyLike, side: Side, layout: Layout): Explained | und
     const label = letter ? (e.shiftKey ? item.base.toUpperCase() : item.base) : item.label;
     const symbol = !letter && !!item.char && item.char !== ' ';
     return { label, name: itemName(item, layout), chord: item.chords[side], letter, symbol };
-  }
-  const nav = NAV_OUTPUT[e.key];
-  const navLayer = layout.layers.find((l) => l.id === 'nav');
-  if (nav && navLayer) {
-    const pos = navLayer.cells[side].indexOf(nav);
-    return { label: nav, name: 'Nav layer (locked)', chord: { press: [GRID[side][pos]] }, letter: false, symbol: false };
   }
   return undefined;
 }

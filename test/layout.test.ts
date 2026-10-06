@@ -177,3 +177,47 @@ describe('stats sharing between versions', () => {
     expect(L090.item('shiftlock')!.id).toBe('shiftlock@0.9');
   });
 });
+
+describe('nav layer drills', () => {
+  const press = (version: '0.8.1' | '0.9.0', side: Side, out: string) => LAYOUTS[version].item(`nav:${out}`)!.chords[side];
+
+  it.each(VERSIONS.map((v) => v.id))('puts each nav key where the nav layer has it (%s)', (version) => {
+    expect(press(version, 'right', 'Up')).toEqual({ press: ['r'], layer: 'nav' });
+    expect(press(version, 'right', 'Home')).toEqual({ press: ['a'], layer: 'nav' });
+    expect(press(version, 'right', 'PgUp')).toEqual({ press: ['s'], layer: 'nav' });
+    expect(press(version, 'right', 'PgDn')).toEqual({ press: ['o'], layer: 'nav' });
+    // Left hand: the nav layer keeps arrows in screen order, so it is not a letter-for-letter mirror.
+    expect(press(version, 'left', 'Home')).toEqual({ press: ['t'], layer: 'nav' });
+    expect(press(version, 'left', 'End')).toEqual({ press: ['a'], layer: 'nav' });
+    expect(press(version, 'left', 'Left')).toEqual({ press: ['i'], layer: 'nav' });
+    expect(press(version, 'left', 'Right')).toEqual({ press: ['e'], layer: 'nav' });
+  });
+
+  it('matches every nav-layer cell, on both sides', () => {
+    for (const version of VERSIONS.map((v) => v.id)) {
+      const L = LAYOUTS[version];
+      const nav = L.layers.find((l) => l.id === 'nav')!;
+      for (const side of ['left', 'right'] as Side[]) {
+        nav.cells[side].forEach((out, i) => {
+          expect(L.item(`nav:${String(out)}`)!.chords[side].press, `${version} ${side} ${String(out)}`).toEqual([GRID[side][i]]);
+        });
+      }
+    }
+  });
+
+  it('has a lesson with all eight keys, recognised by the keys the browser sends', () => {
+    const lesson = L081.lessons.find((l) => l.id === 'nav')!;
+    expect(lesson.items).toHaveLength(8);
+    expect(lesson.items.map((id) => L081.byId.get(id)!.match!.key).sort()).toEqual(
+      ['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp'],
+    );
+  });
+
+  it('shares nav stats between versions', () => {
+    for (const i of L090.navItems) expect(i.id).toBe(i.base);
+  });
+
+  it('describes nav chords', () => {
+    expect(describeChord(L081.item('nav:Up')!.chords.right)).toBe('Nav layer: R');
+  });
+});
