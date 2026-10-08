@@ -6,6 +6,8 @@ This web app helps you learn the [ARTSEY](https://artsey.io) one-handed keyboard
 
 Each push to `main` deploys the site again automatically.
 
+You can install the site as an app. After one visit, the app also works offline. When a new version is deployed, the app gets it the next time that you open it.
+
 ## Commands
 
 ```sh
