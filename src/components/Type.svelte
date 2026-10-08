@@ -13,7 +13,13 @@
 
   let text = $state('');
   let pos = $state(0);
-  let marks = $state<('ok' | 'err')[]>([]);
+  /**
+   * Per character: 'ok' = right first time; 'err' = wrong (Stop mode: right after a retry; Continue
+   * mode: still wrong); 'fixed' = Continue mode only, wrong first and then corrected with Backspace.
+   */
+  let marks = $state<('ok' | 'err' | 'fixed' | undefined)[]>([]);
+  /** Continue mode: the first attempt at each position, which is the only one that feeds the stats. */
+  let firstAttempt: ('ok' | 'err' | undefined)[] = [];
   let missHere = $state(false);
   let wrong = $state<Item>();
   let showHint = $state(false);
@@ -56,8 +62,12 @@
   );
   const slowPairs = $derived(slowestPairs(visiblePairs, 3));
 
-  const wpm = $derived(pos > 1 && lastTs > startTs ? Math.round(pos / 5 / ((lastTs - startTs) / 60000)) : 0);
-  const accuracy = $derived(pos ? Math.round((marks.filter((m) => m === 'ok').length / pos) * 100) : 100);
+  const continueMode = $derived(settings.onError === 'continue');
+  // In Stop mode every typed character ends up right; in Continue mode only 'ok' and 'fixed' ones are.
+  const rightChars = $derived(continueMode ? marks.slice(0, pos).filter((m) => m === 'ok' || m === 'fixed').length : pos);
+  const errorsLeft = $derived(continueMode ? marks.slice(0, pos).filter((m) => m === 'err').length : 0);
+  const wpm = $derived(pos > 1 && lastTs > startTs ? Math.round(rightChars / 5 / ((lastTs - startTs) / 60000)) : 0);
+  const accuracy = $derived(pos ? Math.round((marks.slice(0, pos).filter((m) => m === 'ok').length / pos) * 100) : 100);
   const seconds = $derived(startTs ? ((lastTs - startTs) / 1000).toFixed(1) : '0.0');
 
   function scheduleHint() {
@@ -71,6 +81,7 @@
     text = newText;
     pos = 0;
     marks = [];
+    firstAttempt = [];
     missHere = false;
     missedHere = new Set();
     wrong = undefined;
@@ -117,6 +128,7 @@
     void settings.focusWeak;
     void settings.code;
     void settings.codeSamples;
+    void settings.onError;
     void settings.version;
     void settings.hint;
     untrack(newText);
@@ -134,8 +146,72 @@
     }
     if (!nextItem?.match) return;
     e.preventDefault();
+    if (continueMode) continueKey(e, nextItem);
+    else stopKey(e, nextItem);
+  }
+
+  /** Records the first attempt at the current position: key stats, transition time, confusions. */
+  function recordAttempt(target: Item, right: boolean, typed: Item | undefined, now: number) {
+    if (pos > 0) {
+      settings.stats[target.id] = record(settings.stats[target.id], right, now - lastTs);
+      const prev = L.byChar.get(text[pos - 1]);
+      if (prev) {
+        const key = pairKey(prev.id, target.id);
+        settings.pairStats[key] = record(settings.pairStats[key], right, now - lastTs);
+      }
+    }
+    if (right) {
+      const cleared = clearConfusion(settings.confusions, target.id);
+      if (cleared !== settings.confusions) settings.confusions = cleared;
+    } else if (typed) {
+      settings.confusions = addConfusion(settings.confusions, target.id, typed.id);
+    }
+  }
+
+  function finishIfDone() {
+    if (pos < text.length) {
+      scheduleHint();
+      return;
+    }
+    clearTimeout(hintTimer);
+    const ok = marks.filter((m) => m === 'ok').length;
+    settings.history = logTypeRound(settings.history, text.length, ok, lastTs - startTs);
+  }
+
+  /** Continue mode: every key moves on; Backspace steps back so a character can be typed again. */
+  function continueKey(e: KeyboardEvent, target: Item) {
     const now = performance.now();
-    if (matches(e, nextItem.match)) {
+    if (e.key === 'Backspace') {
+      if (pos === 0) return;
+      pos--;
+      marks[pos] = undefined;
+      wrong = undefined;
+      scheduleHint();
+      return;
+    }
+    if (!startTs) startTs = now;
+    const right = matches(e, target.match!);
+    const typed = right ? target : identify(e, L);
+    const first = firstAttempt[pos];
+    if (first === undefined) {
+      recordAttempt(target, right, typed, now);
+      firstAttempt[pos] = right ? 'ok' : 'err';
+      marks[pos] = right ? 'ok' : 'err';
+    } else {
+      // A retype after Backspace: shown, but the stats keep the first attempt.
+      marks[pos] = !right ? 'err' : first === 'ok' ? 'ok' : 'fixed';
+    }
+    wrong = right ? undefined : typed;
+    if (!right && settings.hint !== 'never') showHint = true;
+    lastTs = now;
+    pos++;
+    finishIfDone();
+  }
+
+  /** Stop mode: a wrong key keeps the cursor here until the right key comes. */
+  function stopKey(e: KeyboardEvent, nextItem: Item) {
+    const now = performance.now();
+    if (matches(e, nextItem.match!)) {
       if (!startTs) startTs = now;
       // The first character has no meaningful timing, so only later ones feed Learn stats.
       if (pos > 0) {
@@ -157,12 +233,7 @@
       missHere = false;
       missedHere = new Set();
       wrong = undefined;
-      if (pos < text.length) scheduleHint();
-      else {
-        clearTimeout(hintTimer);
-        const ok = marks.filter((m) => m === 'ok').length;
-        settings.history = logTypeRound(settings.history, text.length, ok, lastTs - startTs);
-      }
+      finishIfDone();
     } else {
       missHere = true;
       wrong = identify(e, L);
@@ -179,6 +250,13 @@
 
 <div class="type">
   <div class="controls">
+    <label title="Stop: fix each wrong key before you go on. Continue: go on, and use Backspace (R + E) to correct.">
+      On a wrong key
+      <select bind:value={settings.onError}>
+        <option value="stop">Stop</option>
+        <option value="continue">Continue</option>
+      </select>
+    </label>
     {#if settings.code}
       <label>
         Samples
@@ -240,6 +318,7 @@
                 class:sp={ch === ' '}
                 class:ok={marks[i] === 'ok'}
                 class:err={marks[i] === 'err'}
+                class:fixed={marks[i] === 'fixed'}
                 class:cur={i === pos}
                 class:miss={i === pos && missHere}>{ch === ' ' ? '·' : ch}</span
               >
@@ -253,12 +332,16 @@
   <div class="stats">
     <div><b>{wpm}</b><span>wpm</span></div>
     <div><b>{accuracy}%</b><span>accuracy</span></div>
+    {#if continueMode}<div><b>{errorsLeft}</b><span>errors</span></div>{/if}
     <div><b>{seconds}s</b><span>time</span></div>
   </div>
 
   {#if done}
     <div class="result">
-      <p>Done! <b>{wpm} wpm</b> at <b>{accuracy}%</b> accuracy.</p>
+      <p>
+        Done! <b>{wpm} wpm</b> at <b>{accuracy}%</b> accuracy{#if continueMode}, with
+          <b>{errorsLeft}</b> {errorsLeft === 1 ? 'error' : 'errors'} left{/if}.
+      </p>
       {#if slowPairs.length}
         <p class="slow">
           Slowest transitions:
@@ -358,6 +441,9 @@
   }
   .err {
     color: var(--bad);
+  }
+  .fixed {
+    color: var(--hold);
   }
   .cur {
     background: color-mix(in srgb, var(--accent) 30%, transparent);

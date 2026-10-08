@@ -22,5 +22,6 @@ All high-priority items are done.
 - [x] [#5 Type view: add a code mode to practice brackets and symbols](https://github.com/Joxtacy/artsey-trainer/issues/5)
 - [x] [#9 Support both layout versions: 0.8.1 (current) and 0.9.0 (beta)](https://github.com/Joxtacy/artsey-trainer/issues/9)
 - [x] [#6 Add drills for the nav layer](https://github.com/Joxtacy/artsey-trainer/issues/6)
+- [x] [#10 Type view: continue after a wrong key, as in Monkeytype](https://github.com/Joxtacy/artsey-trainer/issues/10)
 
 To see all open roadmap issues, use the [enhancement label](https://github.com/Joxtacy/artsey-trainer/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement).

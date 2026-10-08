@@ -23,6 +23,8 @@ export interface Settings {
   /** Type code samples instead of words. */
   code: boolean;
   codeSamples: number;
+  /** Type view: on a wrong key, stop until it is right, or move on (Backspace corrects). */
+  onError: 'stop' | 'continue';
   /** Daily practice summaries for the Progress view. */
   history: History;
 }
@@ -46,6 +48,7 @@ function defaults(): Settings {
     focusWeak: false,
     code: false,
     codeSamples: 4,
+    onError: 'stop',
     history: {},
   };
 }

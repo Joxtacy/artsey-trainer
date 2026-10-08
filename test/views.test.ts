@@ -42,6 +42,7 @@ beforeEach(() => {
   settings.history = {};
   settings.code = false;
   settings.codeSamples = 4;
+  settings.onError = 'stop';
   settings.lesson = 'pairs';
   settings.hint = 'never';
   settings.side = 'right';
@@ -546,5 +547,114 @@ describe('Learn: nav layer', () => {
     render(Learn);
     pick('Home');
     expect(text('.instr')).toBe('Nav layer: T');
+  });
+});
+
+describe('Type: continue after a wrong key', () => {
+  const useText = (t: string) => {
+    [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Custom text'))!.click();
+    flushSync();
+    const area = document.querySelector('textarea')!;
+    area.value = t;
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    document.querySelector<HTMLButtonElement>('.custom .primary')!.click();
+    flushSync();
+  };
+  const backspace = () => press('Backspace', 'Backspace');
+  const chars = () => [...document.querySelectorAll('.text .c')];
+  const cursorAt = () => chars().findIndex((c) => c.classList.contains('cur'));
+  const markAt = (i: number) => ['ok', 'err', 'fixed'].find((m) => chars()[i].classList.contains(m));
+  const stat = (label: string) => [...document.querySelectorAll('.stats div')].find((d) => d.textContent?.includes(label))?.querySelector('b')?.textContent;
+
+  it('stays on the character after a wrong key in Stop mode', () => {
+    render(Type);
+    useText('hab');
+    typeLetter('h');
+    typeLetter('z');
+    expect(cursorAt()).toBe(1);
+    expect(stat('errors')).toBeUndefined();
+  });
+
+  it('moves on after a wrong key, marks it red, and records the confusion', () => {
+    settings.onError = 'continue';
+    render(Type);
+    useText('hab');
+    typeLetter('h');
+    typeLetter('z');
+    expect(cursorAt()).toBe(2);
+    expect(markAt(1)).toBe('err');
+    expect(settings.confusions).toEqual({ a: { z: 1 } });
+    expect(stat('errors')).toBe('1');
+    expect(text('.wrong')).toContain('You typed Z');
+  });
+
+  it('corrects with Backspace, keeping the stats from the first attempt', () => {
+    settings.onError = 'continue';
+    render(Type);
+    useText('hab');
+    typeLetter('h');
+    typeLetter('z'); // first attempt at "a": wrong
+    const afterMiss = {
+      stat: settings.stats.a,
+      pair: settings.pairStats['h>a'],
+      confusions: JSON.parse(JSON.stringify(settings.confusions)),
+    };
+    expect(afterMiss.stat).toMatchObject({ n: 1, ok: 0 });
+    backspace();
+    expect(cursorAt()).toBe(1);
+    expect(markAt(1)).toBeUndefined();
+    typeLetter('a'); // corrected
+    expect(markAt(1)).toBe('fixed');
+    expect(settings.stats.a).toEqual(afterMiss.stat);
+    expect(settings.pairStats['h>a']).toEqual(afterMiss.pair);
+    expect(settings.confusions).toEqual(afterMiss.confusions);
+    typeLetter('b');
+    expect(text('.result')).toContain('with 0 errors left');
+    // Accuracy is first-try only: "h" and "b" of three characters.
+    expect(text('.result')).toContain('67% accuracy');
+  });
+
+  it('keeps a correct character "ok" after Backspace and a retype', () => {
+    settings.onError = 'continue';
+    render(Type);
+    useText('hab');
+    typeLetter('h');
+    typeLetter('a');
+    const before = settings.stats.a;
+    backspace();
+    typeLetter('a');
+    expect(markAt(1)).toBe('ok');
+    expect(settings.stats.a).toEqual(before);
+  });
+
+  it('can finish with errors left and logs the round', () => {
+    settings.onError = 'continue';
+    render(Type);
+    useText('ab');
+    typeLetter('z');
+    typeLetter('z');
+    expect(text('.result')).toContain('with 2 errors left');
+    expect(settings.history[dayKey(new Date())].type).toMatchObject({ n: 2, ok: 0, rounds: 1 });
+  });
+
+  it('ignores Backspace at the start of the text', () => {
+    settings.onError = 'continue';
+    render(Type);
+    useText('ab');
+    backspace();
+    expect(cursorAt()).toBe(0);
+  });
+
+  it('switches mode from the controls and starts a new text', () => {
+    render(Type);
+    const select = [...document.querySelectorAll('.controls label')]
+      .find((l) => l.textContent?.includes('On a wrong key'))!
+      .querySelector('select')!;
+    select.value = 'continue';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+    expect(settings.onError).toBe('continue');
+    expect(stat('errors')).toBe('0');
   });
 });

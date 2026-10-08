@@ -18,7 +18,7 @@ bun run build    # do a type check and make a production build in dist/
 ## Views
 
 - **Learn**: Practice the keys in lessons, one key at a time. The app shows weak keys and new keys more often. The chord hint shows after a delay, or when you type the wrong key.
-- **Type**: Type real words. You can add punctuation and numbers, or use your own text. A hint shows the chord for the next character. In code mode, you type short lines of code. These lines use the brackets and symbols layers.
+- **Type**: Type real words. You can add punctuation and numbers, or use your own text. A hint shows the chord for the next character. In code mode, you type short lines of code. These lines use the brackets and symbols layers. Select what occurs on a wrong key: stop until you type the correct key, or continue. In the continue mode, use Backspace (R + E) to correct an error.
 - **Progress**: See your typing speed and accuracy for each day, and the trend for each lesson. The app also shows the keys that are due for review.
 - **Chart**: See the full layout for the selected side. When you type, the keys of the chord light up. The character that you typed shows next to them.
 

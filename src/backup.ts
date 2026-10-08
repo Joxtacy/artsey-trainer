@@ -73,6 +73,7 @@ function withValidPreferences(s: Settings): Settings {
     focusWeak: typeof s.focusWeak === 'boolean',
     code: typeof s.code === 'boolean',
     codeSamples: isCount(s.codeSamples) && s.codeSamples > 0,
+    onError: s.onError === 'stop' || s.onError === 'continue',
     wordCount: isCount(s.wordCount) && s.wordCount > 0,
   };
   const fixed = { ...s };
